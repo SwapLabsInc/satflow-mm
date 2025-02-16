@@ -18,8 +18,6 @@ This Node.js application automates bidding (WIP) and listing for Ordinals/Rune m
 | `COLLECTIONS` | Comma-separated list of collections to process (e.g., "runestone,nodemonkes") | - |
 | `LOOP_SECONDS` | Interval (in seconds) for each run | 15 |
 | `LOCAL_WALLET_SEED` | The seed phrase (private—do not commit) | - |
-| `LOCAL_TAP_KEY` | Taproot key used for signing listings on Satflow | - |
-| `LOCAL_WALLET_ADDRESS` | The segwit address associated with your wallet | - |
 | `ZENROWS_API_KEY` | API key for ZenRows (used to proxy or scrape data from Magic Eden) | - |
 | `SATFLOW_API_KEY` | API key for Satflow marketplace | - |
 
