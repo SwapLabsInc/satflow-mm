@@ -26,7 +26,7 @@ async function processCollection(collectionId, walletItems) {
   // Calculate listing price
   const listAbovePercent = Number(process.env[`${collectionId.toUpperCase()}_LIST_ABOVE_PERCENT`]) || 1.2;
   const listingPriceSats = Math.floor(averagePrice * listAbovePercent);
-  const numCheapestItems = process.env[`${collectionId.toUpperCase()}_NUM_CHEAPEST_ITEMS`];
+  const numCheapestItems = Number(process.env[`${collectionId.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
   
   console.log('\nPrice Calculation:');
   console.log(`Average price from ${numCheapestItems} cheapest items: ${averagePrice} sats`);
@@ -51,24 +51,26 @@ function validateEnvironment() {
   // Validate COLLECTIONS is set
   const collections = getConfiguredCollections();
   
+  // Only validate essential base variables
   const baseRequired = [
     'LOCAL_WALLET_SEED',
-    'SATFLOW_API_KEY'
-  ];
-
-  const collectionVars = ['NUM_CHEAPEST_ITEMS', 'LIST_ABOVE_PERCENT', 'BID_BELOW_PERCENT'];
-  const required = [
-    ...baseRequired,
-    ...collections.flatMap(collection => 
-      collectionVars.map(varName => `${collection.toUpperCase()}_${varName}`)
-    )
+    'SATFLOW_API_KEY',
+    'COLLECTIONS'
   ];
   
-  const missing = required.filter(key => !process.env[key]);
+  const missing = baseRequired.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
     console.error('Missing required environment variables:', missing.join(', '));
     process.exit(1);
+  }
+
+  // Log configured collections and their settings
+  for (const collection of collections) {
+    const collectionUpper = collection.toUpperCase();
+    console.log(`\nSettings for ${collection}:`);
+    console.log(`NUM_CHEAPEST_ITEMS: ${process.env[`${collectionUpper}_NUM_CHEAPEST_ITEMS`] || '10 (default)'}`);
+    console.log(`LIST_ABOVE_PERCENT: ${process.env[`${collectionUpper}_LIST_ABOVE_PERCENT`] || '1.2 (default)'}`);
   }
 
   console.log('Configured to process collections:', collections.join(', '));

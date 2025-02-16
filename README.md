@@ -13,20 +13,30 @@ This Node.js application automates bidding (WIP) and listing for Ordinals/Rune m
 
 ## Environment Variables
 
+### Required Variables
+
+| Variable | Description |
+|----------|-------------|
+| `COLLECTIONS` | Comma-separated list of collections to process (e.g., "runestone,nodemonkes") |
+| `LOCAL_WALLET_SEED` | The seed phrase (private—do not commit) |
+| `SATFLOW_API_KEY` | API key for Satflow marketplace |
+
+### Optional Variables
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `COLLECTIONS` | Comma-separated list of collections to process (e.g., "runestone,nodemonkes") | - |
 | `LOOP_SECONDS` | Interval (in seconds) for each run | 15 |
-| `LOCAL_WALLET_SEED` | The seed phrase (private—do not commit) | - |
 | `ZENROWS_API_KEY` | API key for ZenRows (used to proxy or scrape data from Magic Eden) | - |
-| `SATFLOW_API_KEY` | API key for Satflow marketplace | - |
 
-For each collection (e.g., RUNESTONE, NODEMONKES), the following variables can be set:
+### Collection-Specific Variables
+
+For each collection (e.g., RUNESTONE, NODEMONKES), the following optional variables can be set:
+
 | Variable Pattern | Description | Default |
 |----------|-------------|---------|
-| `{COLLECTION}_NUM_CHEAPEST_ITEMS` | Number of cheapest items to average in price calculation | - |
-| `{COLLECTION}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | - |
-| `{COLLECTION}_LIST_ABOVE_PERCENT` | Multiplier to list above the average price (e.g., 1.2 = 120% of average) | - |
+| `{COLLECTION}_NUM_CHEAPEST_ITEMS` | Number of cheapest items to average in price calculation | 10 |
+| `{COLLECTION}_LIST_ABOVE_PERCENT` | Multiplier to list above the average price (e.g., 1.2 = 120% of average) | 1.2 |
+| `{COLLECTION}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | Not implemented yet |
 
 ## Usage
 
@@ -56,9 +66,9 @@ For each collection (e.g., RUNESTONE, NODEMONKES), the following variables can b
 
 2. **Fetch Price Data**: For each collection, the bot calls Magic Eden (via ZenRows) to get listed items and their sat prices.
 
-3. **Calculate Average**: For each collection, it gathers the cheapest N items (defined by `{COLLECTION}_NUM_CHEAPEST_ITEMS`) to compute a baseline average price.
+3. **Calculate Average**: For each collection, it gathers the cheapest N items (default: 10, configurable via `{COLLECTION}_NUM_CHEAPEST_ITEMS`) to compute a baseline average price.
 
-4. **List Items**: The bot checks your wallet on Satflow, sees which items from each collection you hold, and lists them using your desired markup (`{COLLECTION}_LIST_ABOVE_PERCENT`).
+4. **List Items**: The bot checks your wallet on Satflow, sees which items from each collection you hold, and lists them using your desired markup (default: 120%, configurable via `{COLLECTION}_LIST_ABOVE_PERCENT`).
 
 5. **(Future) Bid Items**: Logic for bidding below average (`{COLLECTION}_BID_BELOW_PERCENT`) will be added later.
 

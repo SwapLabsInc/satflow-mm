@@ -14,7 +14,7 @@ async function fetchMarketPrice(collectionSymbol) {
     });
 
     const tokens = data?.tokens || [];
-    const numCheapestItems = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 5;
+    const numCheapestItems = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
     
     console.log(`\n${collectionSymbol} Magic Eden API Response:`);
     console.log('Total tokens found:', tokens.length);
@@ -33,7 +33,7 @@ async function fetchMarketPrice(collectionSymbol) {
 }
 
 function calculateAveragePrice(tokens, collectionSymbol) {
-  const numCheapest = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 5;
+  const numCheapest = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
   const sorted = tokens.sort((a, b) => a.listedPrice - b.listedPrice);
   const slice = sorted.slice(0, numCheapest);
   if (slice.length === 0) return 0;
