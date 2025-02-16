@@ -5,6 +5,10 @@ This Node.js application automates bidding (WIP) and listing for Ordinals/Rune m
 - Magic Eden (as a price index source)
 - Satflow (for listing items and, later, placing bids)
 
+The application comes pre-configured with support for two collections:
+- Runestone
+- NodeMonkes
+
 ## Prerequisites
 
 1. **Node.js v14+**: Make sure you have a recent version of Node installed.
@@ -17,7 +21,7 @@ This Node.js application automates bidding (WIP) and listing for Ordinals/Rune m
 
 | Variable | Description |
 |----------|-------------|
-| `COLLECTIONS` | Comma-separated list of collections to process (e.g., "runestone,nodemonkes") |
+| `COLLECTIONS` | Comma-separated list of collections to process (defaults to "runestone,nodemonkes") |
 | `LOCAL_WALLET_SEED` | The seed phrase (private—do not commit) |
 | `SATFLOW_API_KEY` | API key for Satflow marketplace |
 
@@ -26,6 +30,7 @@ This Node.js application automates bidding (WIP) and listing for Ordinals/Rune m
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LOOP_SECONDS` | Interval (in seconds) for each run | 15 |
+| `UPDATE_THRESHOLD` | Minimum price difference (as decimal) required before updating listings/bids | 0.01 (1%) |
 | `ZENROWS_API_KEY` | API key for ZenRows (used to proxy or scrape data from Magic Eden) | - |
 
 ### Collection-Specific Variables
@@ -37,6 +42,19 @@ For each collection (e.g., RUNESTONE, NODEMONKES), the following optional variab
 | `{COLLECTION}_NUM_CHEAPEST_ITEMS` | Number of cheapest items to average in price calculation | 10 |
 | `{COLLECTION}_LIST_ABOVE_PERCENT` | Multiplier to list above the average price (e.g., 1.2 = 120% of average) | 1.2 |
 | `{COLLECTION}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | Not implemented yet |
+| `PREMIUM_INSCRIPTION_{INSCRIPTION_ID}` | Inscription-specific listing multiplier that overrides the collection's LIST_ABOVE_PERCENT (e.g., 1.2 = 120% of average) | - |
+
+### Premium Inscription Pricing
+
+You can set custom pricing multipliers for specific inscriptions using the `PREMIUM_INSCRIPTION_{INSCRIPTION_ID}` environment variable. This acts like an inscription-specific `LIST_ABOVE_PERCENT`, allowing you to price individual items at a premium (or discount) relative to the collection's average price.
+
+Example:
+```
+# List a specific runestone at 120% of the average price
+PREMIUM_INSCRIPTION_4727db8e2f1e8696b2d8339a8a1dd7e0f12a8a86e2df80eb4afbccfca06667c1i987=1.2
+```
+
+When set, this overrides the collection's `LIST_ABOVE_PERCENT` for that specific inscription. Other inscriptions in the collection continue to use the collection's default `LIST_ABOVE_PERCENT`.
 
 ## Usage
 
@@ -72,7 +90,9 @@ For each collection (e.g., RUNESTONE, NODEMONKES), the following optional variab
 
 5. **(Future) Bid Items**: Logic for bidding below average (`{COLLECTION}_BID_BELOW_PERCENT`) will be added later.
 
-6. **Modularity**: The code supports multiple collections and is written to extend to multiple marketplaces in the future.
+6. **Price Update Threshold**: The bot only updates listings and bids when the price difference exceeds the configured threshold (`UPDATE_THRESHOLD`). For example, with a threshold of 0.01 (1%), a listing at 100,000 sats will only be updated if the new price differs by more than 1,000 sats. This helps reduce the number of updates sent to marketplaces and improves overall market health.
+
+7. **Modularity**: The code supports multiple collections and is written to extend to multiple marketplaces in the future.
 
 ## Notes
 

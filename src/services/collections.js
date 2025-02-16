@@ -19,6 +19,12 @@ function getConfiguredCollections() {
   return collections.split(',').map(c => c.trim()).filter(c => c.length > 0);
 }
 
+function getPremiumMultiplier(inscriptionId) {
+  const premiumKey = `PREMIUM_INSCRIPTION_${inscriptionId}`;
+  const premiumMultiplier = Number(process.env[premiumKey]);
+  return premiumMultiplier || null;
+}
+
 async function processCollection(collectionId, walletItems) {
   console.log(`\n=== Processing ${collectionId} ===`);
   
@@ -76,6 +82,9 @@ async function processCollection(collectionId, walletItems) {
   console.log(`- Bid price (${bidBelowPercent}x): ${bidPriceSats} sats`);
   console.log(`- Can bid on: ${biddingCapacity} items at ${bidPriceSats} sats each`);
 
+  // Get update threshold from environment
+  const updateThreshold = Number(process.env.UPDATE_THRESHOLD) || 0.01; // Default to 1%
+
   // Check if existing bids need to be repriced
   if (existingBids.length > 0) {
     console.log('\nChecking bids for repricing:');
@@ -83,13 +92,13 @@ async function processCollection(collectionId, walletItems) {
     
     for (const bid of existingBids) {
       const priceDiff = Math.abs(bid.price - bidPriceSats);
-      const priceChangePercent = (priceDiff / bid.price) * 100;
+      const priceChangePercent = (priceDiff / bid.price);
       
-      if (priceChangePercent > 5) { // If price changed by more than 5%
+      if (priceChangePercent > updateThreshold) {
         console.log(`Bid ${bid.bid_id} needs repricing:`);
         console.log(`- Current price: ${bid.price} sats`);
         console.log(`- New price: ${bidPriceSats} sats`);
-        console.log(`- Price change: ${priceChangePercent.toFixed(2)}%`);
+        console.log(`- Price change: ${(priceChangePercent * 100).toFixed(2)}%`);
         bidsToCancel.push(bid.bid_id);
       }
     }
@@ -114,10 +123,40 @@ async function processCollection(collectionId, walletItems) {
     console.log('No items to list');
     return;
   }
+
   for (const item of collectionItems) {
     try {
-      await listOnSatflow(item, listingPriceSats);
-      console.log(`✓ Listed ${item.token.inscription_id} at ${listingPriceSats} sats`);
+      const inscriptionId = item.token.inscription_id;
+      const premiumMultiplier = getPremiumMultiplier(inscriptionId);
+      let finalListingPrice = listingPriceSats;
+      
+      if (premiumMultiplier) {
+        // Apply premium directly to the average price
+        finalListingPrice = Math.floor(averagePrice * premiumMultiplier);
+        console.log(`ℹ Premium price for ${inscriptionId}: ${finalListingPrice} sats (${premiumMultiplier}x average)`);
+      }
+
+      // Check if the item is already listed and within threshold
+      const existingListing = item.listing;
+      let shouldList = true;
+
+      if (existingListing) {
+        const priceDiff = Math.abs(existingListing.price - finalListingPrice);
+        const priceChangePercent = priceDiff / existingListing.price;
+        
+        if (priceChangePercent <= updateThreshold) {
+          console.log(`ℹ Skipping ${inscriptionId}: Current price ${existingListing.price} sats is within ${updateThreshold * 100}% threshold`);
+          shouldList = false;
+        } else {
+          console.log(`ℹ Updating ${inscriptionId}: Price change ${(priceChangePercent * 100).toFixed(2)}% exceeds ${updateThreshold * 100}% threshold`);
+          console.log(`  Current: ${existingListing.price} sats → New: ${finalListingPrice} sats`);
+        }
+      }
+
+      if (shouldList) {
+        await listOnSatflow(item, finalListingPrice);
+        console.log(`✓ Listed ${inscriptionId} at ${finalListingPrice} sats`);
+      }
     } catch (error) {
       console.error(`✗ Failed ${item.token.inscription_id}: ${error.message}`);
     }
@@ -129,7 +168,8 @@ function validateEnvironment() {
   const baseRequired = [
     'LOCAL_WALLET_SEED',
     'SATFLOW_API_KEY',
-    'COLLECTIONS'
+    'COLLECTIONS',
+    'UPDATE_THRESHOLD'
   ];
   
   const missing = baseRequired.filter(key => !process.env[key]);
@@ -138,8 +178,16 @@ function validateEnvironment() {
     process.exit(1);
   }
 
+  // Validate UPDATE_THRESHOLD is a valid number between 0 and 1
+  const updateThreshold = Number(process.env.UPDATE_THRESHOLD);
+  if (isNaN(updateThreshold) || updateThreshold < 0 || updateThreshold > 1) {
+    console.error('UPDATE_THRESHOLD must be a number between 0 and 1');
+    process.exit(1);
+  }
+
   console.log('\n=== Configuration ===');
   console.log(`Processing collections: ${collections.join(', ')}`);
+  console.log(`Update threshold: ${updateThreshold * 100}%`);
 }
 
 module.exports = {
