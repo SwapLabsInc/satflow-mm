@@ -76,26 +76,35 @@ async function cancelBids(bidIds) {
     
     const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
     
-    // Get and sign challenge
+    // Get challenge and sign it
     const challenge = await getSatflowChallenge(walletDetails.address);
     const signature = signChallenge(challenge, process.env.LOCAL_WALLET_SEED);
-    await verifySatflowChallenge(walletDetails.address, signature);
+    
+    // Verify locally with the same challenge
+    const verificationResult = await verifySatflowChallenge(walletDetails.address, signature, challenge);
+    if (!verificationResult.verified) {
+      throw new Error('Local signature verification failed');
+    }
 
     // Cancel bids - Important: Use the regular wallet address, NOT the bidding wallet address
-    const config = {
-      headers: {
-        'x-api-key': process.env.SATFLOW_API_KEY
-      }
+    const payload = {
+      address: walletDetails.address,
+      signature,
+      bidIds
     };
-
+    
+    // Debug the exact payload being sent
+    console.error('Sending payload to Satflow:', JSON.stringify(payload));
+    
     const response = await axios.post(
       'https://native.satflow.com/cancel',
-      JSON.stringify({
-        address: walletDetails.address,
-        signature,
-        bidIds
-      }),
-      config
+      payload,
+      {
+        headers: {
+          'x-api-key': process.env.SATFLOW_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
     console.log('Successfully cancelled bids');

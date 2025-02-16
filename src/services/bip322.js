@@ -1,7 +1,10 @@
 const axios = require('axios');
-const bitcoinMessage = require('bitcoinjs-message');
+const { BIP322, Signer, Verifier } = require('bip322-js');
+const { deriveSigningKey, deriveWalletDetails, DEFAULT_DERIVATION_PATH } = require('./wallet-utils');
 const bitcoin = require('bitcoinjs-lib');
-const { deriveSigningKey, DEFAULT_DERIVATION_PATH } = require('./wallet-utils');
+const ecc = require('tiny-secp256k1');
+const { ECPairFactory } = require('ecpair');
+const ECPair = ECPairFactory(ecc);
 
 async function getSatflowChallenge(address) {
   try {
@@ -28,11 +31,16 @@ async function getSatflowChallenge(address) {
   }
 }
 
-async function verifySatflowChallenge(address, signature) {
+async function verifySatflowChallenge(address, signature, challenge) {
   try {
-    // Skip verification since we know the signature is correct
-    // This is a temporary fix until we can properly verify signatures
-    return { verified: true };
+    // If no challenge is provided, get it from the server
+    if (!challenge) {
+      challenge = await getSatflowChallenge(address);
+    }
+    
+    // Use BIP322 verification
+    const isValid = Verifier.verifySignature(address, challenge, signature);
+    return { verified: isValid };
   } catch (error) {
     console.error(`Failed to verify challenge: ${error.message}`);
     throw error;
@@ -41,27 +49,29 @@ async function verifySatflowChallenge(address, signature) {
 
 function signChallenge(challenge, seed) {
   try {
+    // Get the key pair using existing wallet-utils functionality
     const keyPair = deriveSigningKey(seed, DEFAULT_DERIVATION_PATH);
     
-    // Sign using bitcoinjs-message
-    // Note: The private key from BIP32 is already in the correct format
-    const challengeBuffer = Buffer.from(challenge, 'hex');
-    const signature = bitcoinMessage.sign(
-      challengeBuffer,
-      keyPair.privateKey,
-      true, 
-      { segwitType: 'p2wpkh' }
-    );
+    // Get the corresponding address for this key
+    const { address } = deriveWalletDetails(seed);
     
-    const signatureBase64 = signature.toString('base64');
+    // Convert private key to WIF format
+    const ecPair = ECPair.fromPrivateKey(keyPair.privateKey);
+    const wif = ecPair.toWIF();
+    
+    // Sign using BIP322
+    const signature = Signer.sign(
+      wif,
+      address,
+      challenge
+    );
     
     // Debug info for signature generation
     console.error('Signature Generation Debug:');
     console.error('Challenge:', challenge);
-    console.error('Generated Base64:', signatureBase64);
+    console.error('Generated Signature:', signature);
     
-    
-    return signatureBase64;
+    return signature;
   } catch (error) {
     console.error(`Failed to sign challenge: ${error.message}`);
     throw error;
