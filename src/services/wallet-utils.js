@@ -36,19 +36,10 @@ function deriveWalletDetails(seed) {
   // Get tap key (full public key in hex)
   const tapKey = Buffer.from(child.publicKey).toString('hex');
   
-  const details = {
+  return {
     address: p2wpkh.address,
     tapKey
   };
-  
-  console.log('Derived wallet details:', {
-    address: details.address,
-    tapKey: details.tapKey,
-    tapKeyLength: details.tapKey.length,
-    derivationPath: DEFAULT_DERIVATION_PATH
-  });
-  
-  return details;
 }
 
 function deriveSigningKey(seed, path) {

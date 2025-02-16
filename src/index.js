@@ -8,25 +8,19 @@ const { processCollection, validateEnvironment, getConfiguredCollections } = req
 
 async function mainLoop() {
   try {
+    console.log('\n=== Starting New Cycle ===');
+    
     // Fetch wallet contents once for all collections
     const walletItems = await fetchWalletContents();
 
     const collections = getConfiguredCollections();
-    console.log('Processing collections:', collections.join(', '));
-
-    // Process each configured collection
     for (const collectionId of collections) {
       await processCollection(collectionId, walletItems);
     }
 
-    console.log(`\nCycle complete. Next run in ${process.env.LOOP_SECONDS} seconds.\n`);
+    console.log(`\n=== Cycle Complete (Next run in ${process.env.LOOP_SECONDS}s) ===\n`);
   } catch (error) {
-    console.error('Error in main loop:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      headers: error.response?.headers
-    });
+    console.error('Main loop error:', error.message);
   }
 }
 

@@ -1,5 +1,6 @@
 const { fetchMarketPrice, calculateAveragePrice } = require('./marketPrice');
 const { listOnSatflow } = require('./listings');
+const { getBiddingWalletAddress, getBiddingWalletBalance, calculateBiddingCapacity } = require('./bidding');
 
 function getConfiguredCollections() {
   const collections = process.env.COLLECTIONS;
@@ -8,18 +9,27 @@ function getConfiguredCollections() {
     process.exit(1);
   }
   
-  // Parse comma-separated list and trim whitespace
   return collections.split(',').map(c => c.trim()).filter(c => c.length > 0);
 }
 
 async function processCollection(collectionId, walletItems) {
-  console.log(`\nProcessing collection: ${collectionId}`);
+  console.log(`\n=== Processing ${collectionId} ===`);
   
-  // 1. Fetch market data
+  // Get bidding wallet info
+  let biddingBalance = 0;
+  try {
+    const biddingAddress = await getBiddingWalletAddress();
+    biddingBalance = await getBiddingWalletBalance(biddingAddress);
+    console.log(`Bidding wallet balance: ${biddingBalance} sats`);
+  } catch (error) {
+    console.error(`Bidding wallet error: ${error.message}`);
+  }
+
+  // Fetch market data and calculate prices
   const tokens = await fetchMarketPrice(collectionId);
   const averagePrice = calculateAveragePrice(tokens, collectionId);
   if (averagePrice <= 0) {
-    console.log(`No tokens found or average price is invalid for ${collectionId}.`);
+    console.log(`No valid market data for ${collectionId}`);
     return;
   }
 
@@ -28,30 +38,37 @@ async function processCollection(collectionId, walletItems) {
   const listingPriceSats = Math.floor(averagePrice * listAbovePercent);
   const numCheapestItems = Number(process.env[`${collectionId.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
   
-  console.log('\nPrice Calculation:');
-  console.log(`Average price from ${numCheapestItems} cheapest items: ${averagePrice} sats`);
-  console.log(`Listing multiplier: ${listAbovePercent}`);
-  console.log(`Final listing price: ${listingPriceSats} sats`);
+  // Calculate bidding price and capacity
+  const bidBelowPercent = Number(process.env[`${collectionId.toUpperCase()}_BID_BELOW_PERCENT`]) || 0.8;
+  const bidPriceSats = Math.floor(averagePrice * bidBelowPercent);
+  const biddingCapacity = calculateBiddingCapacity(biddingBalance, bidPriceSats);
+  
+  console.log('\nMarket Analysis:');
+  console.log(`- Average price (${numCheapestItems} cheapest): ${averagePrice} sats`);
+  console.log(`- Listing price (${listAbovePercent}x): ${listingPriceSats} sats`);
+  console.log(`- Bid price (${bidBelowPercent}x): ${bidPriceSats} sats`);
+  console.log(`- Can bid on: ${biddingCapacity} items at ${bidPriceSats} sats each`);
 
   // Process items for this collection
-  for (const item of walletItems) {
-    if (item.collection?.id === collectionId) {
-      try {
-        await listOnSatflow(item, listingPriceSats);
-        console.log(`Successfully listed ${item.token.inscription_id} at ${listingPriceSats} sats`);
-      } catch (error) {
-        console.log(`Failed to list ${item.token.inscription_id}, but continuing with other items:`, error.message);
-      }
+  const collectionItems = walletItems.filter(item => item.collection?.id === collectionId);
+  if (collectionItems.length === 0) {
+    console.log('\nNo items to list');
+    return;
+  }
+
+  console.log(`\nProcessing ${collectionItems.length} items for listing:`);
+  for (const item of collectionItems) {
+    try {
+      await listOnSatflow(item, listingPriceSats);
+      console.log(`✓ Listed ${item.token.inscription_id} at ${listingPriceSats} sats`);
+    } catch (error) {
+      console.error(`✗ Failed ${item.token.inscription_id}: ${error.message}`);
     }
   }
 }
 
-// Validate required environment variables
 function validateEnvironment() {
-  // Validate COLLECTIONS is set
   const collections = getConfiguredCollections();
-  
-  // Only validate essential base variables
   const baseRequired = [
     'LOCAL_WALLET_SEED',
     'SATFLOW_API_KEY',
@@ -59,21 +76,13 @@ function validateEnvironment() {
   ];
   
   const missing = baseRequired.filter(key => !process.env[key]);
-  
   if (missing.length > 0) {
     console.error('Missing required environment variables:', missing.join(', '));
     process.exit(1);
   }
 
-  // Log configured collections and their settings
-  for (const collection of collections) {
-    const collectionUpper = collection.toUpperCase();
-    console.log(`\nSettings for ${collection}:`);
-    console.log(`NUM_CHEAPEST_ITEMS: ${process.env[`${collectionUpper}_NUM_CHEAPEST_ITEMS`] || '10 (default)'}`);
-    console.log(`LIST_ABOVE_PERCENT: ${process.env[`${collectionUpper}_LIST_ABOVE_PERCENT`] || '1.2 (default)'}`);
-  }
-
-  console.log('Configured to process collections:', collections.join(', '));
+  console.log('\n=== Configuration ===');
+  console.log(`Processing collections: ${collections.join(', ')}`);
 }
 
 module.exports = {
