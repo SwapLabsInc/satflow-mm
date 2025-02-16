@@ -1,0 +1,28 @@
+{
+    "name": "ordinals-bot",
+    "version": "1.0.0",
+    "description": "Node.js application that automates listing/bidding on Ordinals marketplaces.",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "node src/index.js"
+    },
+    "keywords": [
+        "ordinals",
+        "rune",
+        "btc",
+        "marketplace",
+        "listing-bot"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "axios": "^1.4.0",
+        "bip32": "^5.0.0-rc.0",
+        "bip39": "^3.1.0",
+        "bitcoinjs-lib": "^6.1.0",
+        "dotenv": "^16.3.1",
+        "ecpair": "^3.0.0-rc.0",
+        "tiny-secp256k1": "^2.2.3"
+    }
+}
