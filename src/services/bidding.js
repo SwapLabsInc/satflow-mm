@@ -131,11 +131,69 @@ function getCollectionBids(bids, collectionId) {
   );
 }
 
+async function createBid(collectionSlug, price, quantity) {
+  try {
+    const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
+    
+    // Get challenge and sign it for bid verification
+    const challenge = await getSatflowChallenge(walletDetails.address);
+    
+    // Calculate bid expiry (7 days from now)
+    const bidExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days in milliseconds
+    
+    // Create the unsigned bidding message with format:
+    // <bidder_payment_address>:<bidder_payment_address_pubkey>:<bidder_token_receive_address>:<price>:<quantity>:<bid_expiry>:<collection_slug>:<timestamp>
+    const timestamp = Date.now();
+    const unsignedMessage = `${walletDetails.address}:${walletDetails.tapKey}:${walletDetails.address}:${price}:${quantity}:${bidExpiry}:${collectionSlug}:${timestamp}`;
+    
+    // Sign the bidding message using BIP322
+    const signedBiddingMessage = signChallenge(unsignedMessage, process.env.LOCAL_WALLET_SEED);
+    
+    // Get bidding wallet address for receiving tokens
+    const biddingAddress = await getBiddingWalletAddress();
+    
+    const payload = {
+      bid_expiry: bidExpiry,
+      bidder_payment_address: walletDetails.address,
+      bidder_payment_address_pubkey: walletDetails.tapKey,
+      bidder_token_receive_address: walletDetails.address,
+      meta_type: 'ordinals',
+      collection_slug: collectionSlug,
+      price,
+      quantity,
+      signed_bidding_message: signedBiddingMessage,
+      timestamp: timestamp
+    };
+
+    const response = await axios.post(
+      'https://native.satflow.com/bid',
+      payload,
+      {
+        headers: {
+          'x-api-key': process.env.SATFLOW_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log(`Successfully created bid for ${collectionSlug}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Failed to create bid: ${error.message}`);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+    }
+    throw error;
+  }
+}
+
 module.exports = {
   getBiddingWalletAddress,
   getBiddingWalletBalance,
   calculateBiddingCapacity,
   getExistingBids,
   cancelBids,
-  getCollectionBids
+  getCollectionBids,
+  createBid
 };

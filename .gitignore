@@ -8,3 +8,4 @@ npm-install.log
 # Output.log (used for debugging)
 output.log
 output.txt
+test_output.txt

@@ -6,7 +6,8 @@ const {
   calculateBiddingCapacity,
   getExistingBids,
   getCollectionBids,
-  cancelBids
+  cancelBids,
+  createBid
 } = require('./bidding');
 
 function getConfiguredCollections() {
@@ -73,7 +74,8 @@ async function processCollection(collectionId, walletItems) {
   
   // Calculate bidding price and capacity
   const bidBelowPercent = Number(process.env[`${collectionId.toUpperCase()}_BID_BELOW_PERCENT`]) || 0.8;
-  const bidPriceSats = Math.floor(averagePrice * bidBelowPercent);
+  // Round bid price to nearest 1000 sats
+  const bidPriceSats = Math.round(averagePrice * bidBelowPercent / 1000) * 1000;
   const biddingCapacity = calculateBiddingCapacity(biddingBalance, bidPriceSats);
   
   console.log('\nMarket Analysis:');
@@ -108,10 +110,25 @@ async function processCollection(collectionId, walletItems) {
         console.log(`\nCancelling ${bidsToCancel.length} bids for repricing...`);
         await cancelBids(bidsToCancel);
         console.log('Successfully cancelled bids');
-        // TODO: Place new bids at updated price once bid creation is implemented
+        
+        // Create new bid at updated price
+        console.log(`Creating new bid at ${bidPriceSats} sats for ${biddingCapacity} items...`);
+        await createBid(collectionId, bidPriceSats, biddingCapacity);
+        console.log('Successfully created new bid');
       } catch (error) {
-        console.error('Failed to cancel bids:', error.message);
+        console.error('Failed to update bids:', error.message);
       }
+    }
+  }
+
+  // If no existing bids and we have bidding capacity, create a new bid
+  if (existingBids.length === 0 && biddingCapacity > 0) {
+    try {
+      console.log(`\nCreating new bid at ${bidPriceSats} sats for ${biddingCapacity} items...`);
+      await createBid(collectionId, bidPriceSats, biddingCapacity);
+      console.log('Successfully created new bid');
+    } catch (error) {
+      console.error('Failed to create bid:', error.message);
     }
   }
 
