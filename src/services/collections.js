@@ -1,6 +1,13 @@
 const { fetchMarketPrice, calculateAveragePrice } = require('./marketPrice');
 const { listOnSatflow } = require('./listings');
-const { getBiddingWalletAddress, getBiddingWalletBalance, calculateBiddingCapacity } = require('./bidding');
+const { 
+  getBiddingWalletAddress, 
+  getBiddingWalletBalance,
+  calculateBiddingCapacity,
+  getExistingBids,
+  getCollectionBids,
+  cancelBids
+} = require('./bidding');
 
 function getConfiguredCollections() {
   const collections = process.env.COLLECTIONS;
@@ -17,12 +24,32 @@ async function processCollection(collectionId, walletItems) {
   
   // Get bidding wallet info
   let biddingBalance = 0;
+  let biddingAddress = '';
   try {
-    const biddingAddress = await getBiddingWalletAddress();
+    biddingAddress = await getBiddingWalletAddress();
     biddingBalance = await getBiddingWalletBalance(biddingAddress);
     console.log(`Bidding wallet balance: ${biddingBalance} sats`);
   } catch (error) {
     console.error(`Bidding wallet error: ${error.message}`);
+    return;
+  }
+
+  // Get existing bids for this collection
+  let existingBids = [];
+  try {
+    const allBids = await getExistingBids();
+    existingBids = getCollectionBids(allBids, collectionId);
+    if (existingBids.length > 0) {
+      console.log('\nExisting Collection Bids:');
+      existingBids.forEach(bid => {
+        const expirationDate = new Date(bid.expiration).toLocaleString();
+        console.log(`- ${bid.bid_id}: ${bid.price} sats (expires: ${expirationDate})`);
+      });
+    } else {
+      console.log('\nNo existing bids for this collection');
+    }
+  } catch (error) {
+    console.error(`Failed to fetch existing bids: ${error.message}`);
   }
 
   // Fetch market data and calculate prices
@@ -49,14 +76,44 @@ async function processCollection(collectionId, walletItems) {
   console.log(`- Bid price (${bidBelowPercent}x): ${bidPriceSats} sats`);
   console.log(`- Can bid on: ${biddingCapacity} items at ${bidPriceSats} sats each`);
 
-  // Process items for this collection
-  const collectionItems = walletItems.filter(item => item.collection?.id === collectionId);
-  if (collectionItems.length === 0) {
-    console.log('\nNo items to list');
-    return;
+  // Check if existing bids need to be repriced
+  if (existingBids.length > 0) {
+    console.log('\nChecking bids for repricing:');
+    const bidsToCancel = [];
+    
+    for (const bid of existingBids) {
+      const priceDiff = Math.abs(bid.price - bidPriceSats);
+      const priceChangePercent = (priceDiff / bid.price) * 100;
+      
+      if (priceChangePercent > 5) { // If price changed by more than 5%
+        console.log(`Bid ${bid.bid_id} needs repricing:`);
+        console.log(`- Current price: ${bid.price} sats`);
+        console.log(`- New price: ${bidPriceSats} sats`);
+        console.log(`- Price change: ${priceChangePercent.toFixed(2)}%`);
+        bidsToCancel.push(bid.bid_id);
+      }
+    }
+
+    if (bidsToCancel.length > 0) {
+      try {
+        console.log(`\nCancelling ${bidsToCancel.length} bids for repricing...`);
+        await cancelBids(bidsToCancel);
+        console.log('Successfully cancelled bids');
+        // TODO: Place new bids at updated price once bid creation is implemented
+      } catch (error) {
+        console.error('Failed to cancel bids:', error.message);
+      }
+    }
   }
 
+  // Process items for this collection
+  const collectionItems = walletItems.filter(item => item.collection?.id === collectionId);
+  
   console.log(`\nProcessing ${collectionItems.length} items for listing:`);
+  if (collectionItems.length === 0) {
+    console.log('No items to list');
+    return;
+  }
   for (const item of collectionItems) {
     try {
       await listOnSatflow(item, listingPriceSats);

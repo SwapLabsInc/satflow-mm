@@ -12,10 +12,18 @@ async function mainLoop() {
     
     // Fetch wallet contents once for all collections
     const walletItems = await fetchWalletContents();
+    if (!walletItems || !Array.isArray(walletItems)) {
+      throw new Error('Invalid wallet items response');
+    }
 
     const collections = getConfiguredCollections();
     for (const collectionId of collections) {
-      await processCollection(collectionId, walletItems);
+      try {
+        await processCollection(collectionId, walletItems);
+      } catch (error) {
+        console.error(`Error processing collection ${collectionId}:`, error.message);
+        // Continue with next collection
+      }
     }
 
     console.log(`\n=== Cycle Complete (Next run in ${process.env.LOOP_SECONDS}s) ===\n`);

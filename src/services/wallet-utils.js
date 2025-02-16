@@ -9,7 +9,8 @@ const bip39 = require('bip39');
 
 bitcoin.initEccLib(ecc);
 
-// Default derivation path for BTC
+// Default derivation path for BTC - DO NOT CHANGE
+// This path is critical for generating the correct addresses and keys
 const DEFAULT_DERIVATION_PATH = "m/84'/0'/0'/0/0";
 
 function deriveWalletDetails(seed) {
@@ -54,14 +55,8 @@ function deriveSigningKey(seed, path) {
   const root = bip32.fromSeed(seedBuffer);
   const child = root.derivePath(path);
   
-  // Create ECPair with custom sign function that returns Buffer
-  const keyPair = ECPair.fromPrivateKey(child.privateKey);
-  const originalSign = keyPair.sign.bind(keyPair);
-  keyPair.sign = (hash) => {
-    const signature = originalSign(hash);
-    return Buffer.from(signature);
-  };
-  return keyPair;
+  // Return the child key directly since it has the correct format
+  return child;
 }
 
 module.exports = {
