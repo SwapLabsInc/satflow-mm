@@ -11,7 +11,7 @@ async function listOnSatflow(item, listingPriceSats) {
       address: walletDetails.address,
       tapKeyLength: walletDetails.tapKey.length
     });
-    
+
     const config = {
       headers: {
         'x-api-key': process.env.SATFLOW_API_KEY
@@ -29,7 +29,7 @@ async function listOnSatflow(item, listingPriceSats) {
     };
 
     console.log('Sending intent/sell request...');
-    
+
     // Get the PSBT
     console.log('Intent/sell payload:', JSON.stringify(intentSellPayload, null, 2));
     const intentRes = await axios.post(
@@ -41,7 +41,7 @@ async function listOnSatflow(item, listingPriceSats) {
     console.log('Intent/sell response:', JSON.stringify(intentRes.data, null, 2));
 
     const unsignedListingPSBTBase64 = intentRes.data.seller.unsignedListingPSBTBase64;
-    
+
     if (!unsignedListingPSBTBase64) {
       throw new Error('No PSBT found in response');
     }
@@ -73,10 +73,10 @@ async function listOnSatflow(item, listingPriceSats) {
       console.error('Error signing listing PSBT:', error);
       throw error;
     }
-    
+
     // Sign secure listing PSBTs
     const signedSecureListingPSBTs = [];
-    
+
     try {
       // Sign secure listing PSBTs if any
       if (secureListingPSBTs.length > 0) {
@@ -87,7 +87,7 @@ async function listOnSatflow(item, listingPriceSats) {
           }
           console.log('Signing secure listing PSBT:', securePsbtData.base64);
           let securePsbt = bitcoin.Psbt.fromBase64(securePsbtData.base64, { network: bitcoin.networks.bitcoin });
-          
+
           // Decode and inspect the secure PSBT
           console.log('Secure PSBT details:');
           console.log('- Number of inputs:', securePsbt.data.inputs.length);
@@ -95,7 +95,7 @@ async function listOnSatflow(item, listingPriceSats) {
           console.log('- Global fields:', securePsbt.data.globalMap);
           console.log('- Input details:', JSON.stringify(securePsbt.data.inputs, null, 2));
           console.log('- Output details:', JSON.stringify(securePsbt.data.outputs, null, 2));
-          
+
           // Sign the secure PSBT with SIGHASH_ALL | ANYONECANPAY
           securePsbt = signPSBT(securePsbt, signingKey, true, securePsbtData.indicesToSign, walletDetails.tapKey);
           signedSecureListingPSBTs.push(securePsbt.toBase64());
