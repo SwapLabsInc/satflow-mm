@@ -93,9 +93,6 @@ async function cancelBids(bidIds) {
       bidIds
     };
     
-    // Debug the exact payload being sent
-    console.error('Sending payload to Satflow:', JSON.stringify(payload));
-    
     const response = await axios.post(
       'https://native.satflow.com/cancel',
       payload,
