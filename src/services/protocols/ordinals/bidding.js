@@ -1,12 +1,17 @@
 const axios = require('axios');
 const { deriveWalletDetails } = require('../../wallet-utils');
-const { getSatflowChallenge, verifySatflowChallenge, signChallenge } = require('../../bip322');
+const { signChallenge } = require('../../bip322');
 
 class OrdinalsBiddingService {
   constructor() {
     if (!process.env.SATFLOW_API_KEY) {
       throw new Error('SATFLOW_API_KEY environment variable is required');
     }
+    this.signature = null;
+  }
+
+  setSignature(signature) {
+    this.signature = signature;
   }
 
   async getBiddingWalletAddress() {
@@ -83,19 +88,13 @@ class OrdinalsBiddingService {
       
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       
-      // Get challenge and sign it
-      const challenge = await getSatflowChallenge(walletDetails.address);
-      const signature = signChallenge(challenge, process.env.LOCAL_WALLET_SEED);
-      
-      // Verify locally with the same challenge
-      const verificationResult = await verifySatflowChallenge(walletDetails.address, signature, challenge);
-      if (!verificationResult.verified) {
-        throw new Error('Local signature verification failed');
+      if (!this.signature) {
+        throw new Error('Signature not set - must be initialized at start of cycle');
       }
 
       const payload = {
         address: walletDetails.address,
-        signature,
+        signature: this.signature,
         bidIds
       };
       
@@ -133,8 +132,9 @@ class OrdinalsBiddingService {
     try {
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       
-      // Get challenge and sign it for bid verification
-      const challenge = await getSatflowChallenge(walletDetails.address);
+      if (!this.signature) {
+        throw new Error('Signature not set - must be initialized at start of cycle');
+      }
       
       // Calculate bid expiry (7 days from now)
       const bidExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000);
@@ -156,7 +156,9 @@ class OrdinalsBiddingService {
         price,
         quantity,
         signed_bidding_message: signedBiddingMessage,
-        timestamp: timestamp
+        timestamp: timestamp,
+        address: walletDetails.address,
+        signature: this.signature
       };
 
       const response = await axios.post(
