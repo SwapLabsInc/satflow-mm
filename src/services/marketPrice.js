@@ -10,14 +10,7 @@ async function fetchMarketPrice(collectionSymbol) {
     const tokens = data?.tokens || [];
     const numCheapestItems = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
     
-    if (tokens.length > 0) {
-      tokens.sort((a, b) => a.listedPrice - b.listedPrice);
-      const cheapestTokens = tokens.slice(0, numCheapestItems);
-      console.log('\nCheapest listings:');
-      cheapestTokens.forEach(token => {
-        console.log(`${token.id}: ${token.listedPrice} sats`);
-      });
-    } else {
+    if (tokens.length === 0) {
       console.log('No listings found');
     }
     

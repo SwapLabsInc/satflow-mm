@@ -47,11 +47,7 @@ async function processCollection(collectionId, walletItems) {
     const allBids = await getExistingBids();
     existingBids = getCollectionBids(allBids, collectionId);
     if (existingBids.length > 0) {
-      console.log('\nExisting Collection Bids:');
-      existingBids.forEach(bid => {
-        const expirationDate = new Date(bid.expiration).toLocaleString();
-        console.log(`- ${bid.bid_id}: ${bid.price} sats (expires: ${expirationDate})`);
-      });
+      console.log(`\nExisting Collection Bids: ${existingBids.length} bids at ${existingBids[0].price} sats`);
     } else {
       console.log('\nNo existing bids for this collection');
     }
