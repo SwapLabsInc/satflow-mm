@@ -47,7 +47,15 @@ async function processCollection(collectionId, walletItems) {
     const allBids = await getExistingBids();
     existingBids = getCollectionBids(allBids, collectionId);
     if (existingBids.length > 0) {
+      const totalBidAmount = existingBids[0].price * existingBids.length;
+      const collectionLimit = Number(process.env[`${collectionId.toUpperCase()}_MAX_BID_TOTAL`]) || Infinity;
       console.log(`\nExisting Collection Bids: ${existingBids.length} bids at ${existingBids[0].price} sats`);
+      console.log(`Total Bid Amount: ${totalBidAmount} sats`);
+      console.log(`Collection Limit: ${collectionLimit} sats`);
+      if (totalBidAmount > collectionLimit) {
+        console.log(`⚠️ Current bids exceed collection limit by ${totalBidAmount - collectionLimit} sats`);
+        console.log(`Will need to cancel approximately ${Math.ceil((totalBidAmount - collectionLimit) / existingBids[0].price)} bids to get under limit`);
+      }
     } else {
       console.log('\nNo existing bids for this collection');
     }
@@ -83,21 +91,35 @@ async function processCollection(collectionId, walletItems) {
   // Get update threshold from environment
   const updateThreshold = Number(process.env.UPDATE_THRESHOLD) || 0.01; // Default to 1%
 
-  // Check if existing bids need to be repriced
+  // Check if existing bids need to be repriced or exceed limit
   if (existingBids.length > 0) {
-    console.log('\nChecking bids for repricing:');
+    console.log('\nChecking bids for repricing and limit compliance:');
     const bidsToCancel = [];
+    const collectionLimit = Number(process.env[`${collectionId.toUpperCase()}_MAX_BID_TOTAL`]) || Infinity;
     
-    for (const bid of existingBids) {
-      const priceDiff = Math.abs(bid.price - bidPriceSats);
-      const priceChangePercent = (priceDiff / bid.price);
+    // Calculate total of all bids
+    const totalBidAmount = existingBids[0].price * existingBids.length;
+    
+    // If total exceeds limit, we need to cancel bids to get under limit
+    if (totalBidAmount > collectionLimit) {
+      console.log(`\nTotal bid amount ${totalBidAmount} exceeds collection limit ${collectionLimit}`);
+      console.log(`Need to cancel bids to get under limit...`);
       
-      if (priceChangePercent > updateThreshold) {
-        console.log(`Bid ${bid.bid_id} needs repricing:`);
-        console.log(`- Current price: ${bid.price} sats`);
-        console.log(`- New price: ${bidPriceSats} sats`);
-        console.log(`- Price change: ${(priceChangePercent * 100).toFixed(2)}%`);
-        bidsToCancel.push(bid.bid_id);
+      // Cancel all bids - we'll create a new right-sized bid after
+      bidsToCancel.push(...existingBids.map(bid => bid.bid_id));
+    } else {
+      // If under limit, only check for repricing
+      for (const bid of existingBids) {
+        const priceDiff = Math.abs(bid.price - bidPriceSats);
+        const priceChangePercent = (priceDiff / bid.price);
+        
+        if (priceChangePercent > updateThreshold) {
+          console.log(`Bid ${bid.bid_id} needs repricing:`);
+          console.log(`- Current price: ${bid.price} sats`);
+          console.log(`- New price: ${bidPriceSats} sats`);
+          console.log(`- Price change: ${(priceChangePercent * 100).toFixed(2)}%`);
+          bidsToCancel.push(bid.bid_id);
+        }
       }
     }
 
@@ -107,10 +129,21 @@ async function processCollection(collectionId, walletItems) {
         await cancelBids(bidsToCancel);
         console.log('Successfully cancelled bids');
         
-        // Create new bid at updated price
-        console.log(`Creating new bid at ${bidPriceSats} sats for ${biddingCapacity} items...`);
-        await createBid(collectionId, bidPriceSats, biddingCapacity);
-        console.log('Successfully created new bid');
+        // Create new bid at updated price, respecting collection bid limit
+        const remainingBids = existingBids.filter(bid => !bidsToCancel.includes(bid.bid_id));
+        const remainingBidsTotal = remainingBids[0]?.price * remainingBids.length || 0;
+        const collectionLimit = Number(process.env[`${collectionId.toUpperCase()}_MAX_BID_TOTAL`]) || Infinity;
+        const availableForBidding = collectionLimit - remainingBidsTotal;
+        const maxQuantityByLimit = Math.floor(availableForBidding / bidPriceSats);
+        const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
+
+        if (finalBidQuantity > 0) {
+          console.log(`Creating new bid at ${bidPriceSats} sats for ${finalBidQuantity} items...`);
+          await createBid(collectionId, bidPriceSats, finalBidQuantity);
+          console.log('Successfully created new bid');
+        } else {
+          console.log('Cannot create new bid: would exceed collection bid limit');
+        }
       } catch (error) {
         console.error('Failed to update bids:', error.message);
       }
@@ -120,9 +153,17 @@ async function processCollection(collectionId, walletItems) {
   // If no existing bids and we have bidding capacity, create a new bid
   if (existingBids.length === 0 && biddingCapacity > 0) {
     try {
-      console.log(`\nCreating new bid at ${bidPriceSats} sats for ${biddingCapacity} items...`);
-      await createBid(collectionId, bidPriceSats, biddingCapacity);
-      console.log('Successfully created new bid');
+      const collectionLimit = Number(process.env[`${collectionId.toUpperCase()}_MAX_BID_TOTAL`]) || Infinity;
+      const maxQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
+      const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
+
+      if (finalBidQuantity > 0) {
+        console.log(`\nCreating new bid at ${bidPriceSats} sats for ${finalBidQuantity} items...`);
+        await createBid(collectionId, bidPriceSats, finalBidQuantity);
+        console.log('Successfully created new bid');
+      } else {
+        console.log('\nCannot create new bid: would exceed collection bid limit');
+      }
     } catch (error) {
       console.error('Failed to create bid:', error.message);
     }

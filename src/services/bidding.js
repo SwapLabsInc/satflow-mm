@@ -128,8 +128,32 @@ function getCollectionBids(bids, collectionId) {
   );
 }
 
+function calculateTotalBidAmount(bids) {
+  return bids.reduce((total, bid) => total + (bid.price * bid.quantity), 0);
+}
+
+function getCollectionBidLimit(collectionSlug) {
+  const envVar = `${collectionSlug.toUpperCase()}_MAX_BID_TOTAL`;
+  const limit = process.env[envVar];
+  return limit ? parseInt(limit) : Infinity;
+}
+
+function wouldExceedBidLimit(existingBids, collectionId, newBidPrice, newBidQuantity) {
+  const collectionBids = getCollectionBids(existingBids, collectionId);
+  const currentTotal = calculateTotalBidAmount(collectionBids);
+  const newTotal = currentTotal + (newBidPrice * newBidQuantity);
+  const limit = getCollectionBidLimit(collectionId);
+  return newTotal > limit;
+}
+
 async function createBid(collectionSlug, price, quantity) {
   try {
+    // Check collection bid limit
+    const existingBids = await getExistingBids();
+    if (wouldExceedBidLimit(existingBids, collectionSlug, price, quantity)) {
+      throw new Error(`Creating this bid would exceed the collection's total bid limit`);
+    }
+
     const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
     
     // Get challenge and sign it for bid verification
@@ -192,5 +216,8 @@ module.exports = {
   getExistingBids,
   cancelBids,
   getCollectionBids,
-  createBid
+  createBid,
+  calculateTotalBidAmount,
+  getCollectionBidLimit,
+  wouldExceedBidLimit
 };
