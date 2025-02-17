@@ -22,9 +22,24 @@ async function fetchWalletContents() {
 
     // Log summary of wallet contents
     const collections = data.results.summary || [];
+    const items = data.results.items || [];
+    
+    // Build accurate listing counts from items data
+    const listingCounts = {};
+    items.forEach(item => {
+      if (item.collection?.id) {
+        listingCounts[item.collection.id] = listingCounts[item.collection.id] || { total: 0, listed: 0 };
+        listingCounts[item.collection.id].total++;
+        if (item.listing) {
+          listingCounts[item.collection.id].listed++;
+        }
+      }
+    });
+
     collections.forEach(collection => {
       if (collection.collection?.id) {
-        console.log(`${collection.collection.name}: ${collection.ownership.tokenCount} items (${collection.ownership.onSaleCount} listed)`);
+        const counts = listingCounts[collection.collection.id] || { total: 0, listed: 0 };
+        console.log(`${collection.collection.name}: ${counts.total} items (${counts.listed} listed)`);
       }
     });
 
