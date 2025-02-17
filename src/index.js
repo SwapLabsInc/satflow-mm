@@ -8,10 +8,15 @@ const { deriveWalletDetails } = require('./services/wallet-utils');
 const { getSatflowChallenge, verifySatflowChallenge, signChallenge } = require('./services/bip322');
 const { OrdinalsCollectionManager } = require('./services/protocols/ordinals/collection-manager');
 const { RunesCollectionManager } = require('./services/protocols/runes/collection-manager');
+const { validateBaseEnvironment, validateWalletEnvironment } = require('./services/core/environment');
 
 async function mainLoop() {
   try {
     console.log('\n=== Starting New Cycle ===');
+    
+    // Validate environment variables
+    validateBaseEnvironment();
+    await validateWalletEnvironment();
     
     // Initialize collection managers for each protocol
     const ordinalsManager = new OrdinalsCollectionManager();

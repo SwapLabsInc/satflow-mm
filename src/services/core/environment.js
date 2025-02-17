@@ -1,3 +1,41 @@
+const { decrypt } = require('./encryption');
+
+async function validateWalletEnvironment() {
+  // Check for either encrypted or plaintext seed
+  if (!process.env.LOCAL_WALLET_SEED && !process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
+    console.error('Either LOCAL_WALLET_SEED or LOCAL_WALLET_SEED_ENCRYPTED must be set');
+    process.exit(1);
+  }
+
+  // If both are provided, warn user
+  if (process.env.LOCAL_WALLET_SEED && process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
+    console.warn('Both LOCAL_WALLET_SEED and LOCAL_WALLET_SEED_ENCRYPTED are set. Using encrypted seed.');
+  }
+
+  // If using encrypted seed, prompt for password
+  if (process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
+    const prompts = require('prompts');
+    const { password } = await prompts({
+      type: 'password',
+      name: 'password',
+      message: 'Enter your wallet seed decryption password:',
+    });
+
+    if (!password) {
+      console.error('Password is required to decrypt the wallet seed');
+      process.exit(1);
+    }
+
+    try {
+      const decrypted = decrypt(process.env.LOCAL_WALLET_SEED_ENCRYPTED, password);
+      process.env.LOCAL_WALLET_SEED = decrypted;
+    } catch (error) {
+      console.error('Failed to decrypt seed phrase. Invalid password.');
+      process.exit(1);
+    }
+  }
+}
+
 function validateBaseEnvironment() {
   const baseRequired = [
     'COLLECTIONS',
@@ -70,5 +108,6 @@ function validateBaseEnvironment() {
 }
 
 module.exports = {
-  validateBaseEnvironment
+  validateBaseEnvironment,
+  validateWalletEnvironment
 };

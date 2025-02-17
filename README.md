@@ -22,7 +22,7 @@ The application supports both Ordinals collections and Runes:
 | Variable | Description |
 |----------|-------------|
 | `COLLECTIONS` | Comma-separated list of collections/runes to process. Format: `collection_name` for Ordinals, `rune:TICKER` for Runes (e.g., "runestone,nodemonkes,rune:DOGGOTOTHEMOON") |
-| `LOCAL_WALLET_SEED` | The seed phrase (private—do not commit) |
+| `LOCAL_WALLET_SEED` or (`LOCAL_WALLET_SEED_ENCRYPTED` + `LOCAL_WALLET_SEED_PASSWORD`) | Either the plaintext seed phrase (not recommended for production) or the encrypted seed with its password (recommended for production). See [Seed Encryption](#seed-encryption) below. |
 | `SATFLOW_API_KEY` | API key for Satflow marketplace (easily obtained by requesting in our [Discord](https://discord.gg/satflow)) |
 
 ### Optional Variables
@@ -67,6 +67,25 @@ PREMIUM_INSCRIPTION_4727db8e2f1e8696b2d8339a8a1dd7e0f12a8a86e2df80eb4afbccfca066
 ```
 
 When set, this overrides the collection's `LIST_ABOVE_PERCENT` for that specific inscription. Other inscriptions in the collection continue to use the collection's default `LIST_ABOVE_PERCENT`.
+
+## Seed Encryption
+
+For enhanced security, especially in production environments, you can encrypt your wallet seed phrase. The application provides a built-in tool to help you encrypt your seed:
+
+1. **Encrypt Your Seed**:
+   ```bash
+   npm run encrypt-seed
+   ```
+   This interactive tool will:
+   - Let you enter a new seed phrase or use an existing one from your .env file
+   - Validate the seed phrase
+   - Prompt for an encryption password
+   - Generate the encrypted seed
+   - Provide the necessary environment variables
+
+2. **Update Environment**:
+   - Replace `LOCAL_WALLET_SEED` with the generated `LOCAL_WALLET_SEED_ENCRYPTED` in your .env file
+   - The application will prompt for your decryption password each time it starts
 
 ## Usage
 
