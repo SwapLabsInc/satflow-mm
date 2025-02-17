@@ -1,4 +1,4 @@
-# Ordinal/Rune Marketplace Bid & Listing Bot
+# Satflow Market Maker - Ordinal/Rune Marketplace Bid & Listing Bot
 
 This Node.js application automates bidding and listing for Ordinals/Rune marketplace items. It currently uses:
 
