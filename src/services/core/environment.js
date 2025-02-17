@@ -1,6 +1,6 @@
 const { decrypt } = require('./encryption');
 
-async function validateWalletEnvironment() {
+function validateWalletEnvironment(password) {
   // Check for either encrypted or plaintext seed
   if (!process.env.LOCAL_WALLET_SEED && !process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
     console.error('Either LOCAL_WALLET_SEED or LOCAL_WALLET_SEED_ENCRYPTED must be set');
@@ -12,15 +12,8 @@ async function validateWalletEnvironment() {
     console.warn('Both LOCAL_WALLET_SEED and LOCAL_WALLET_SEED_ENCRYPTED are set. Using encrypted seed.');
   }
 
-  // If using encrypted seed, prompt for password
+  // If using encrypted seed, decrypt with provided password
   if (process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
-    const prompts = require('prompts');
-    const { password } = await prompts({
-      type: 'password',
-      name: 'password',
-      message: 'Enter your wallet seed decryption password:',
-    });
-
     if (!password) {
       console.error('Password is required to decrypt the wallet seed');
       process.exit(1);

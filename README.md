@@ -23,7 +23,7 @@ The application supports both Ordinals collections and Runes:
 |----------|-------------|
 | `COLLECTIONS` | Comma-separated list of collections/runes to process. Format: `collection_name` for Ordinals, `rune:TICKER` for Runes (e.g., "runestone,nodemonkes,rune:DOGGOTOTHEMOON") |
 | `LOCAL_WALLET_SEED` or (`LOCAL_WALLET_SEED_ENCRYPTED` + `LOCAL_WALLET_SEED_PASSWORD`) | Either the plaintext seed phrase (not recommended for production) or the encrypted seed with its password (recommended for production). See [Seed Encryption](#seed-encryption) below. |
-| `SATFLOW_API_KEY` | API key for Satflow marketplace (easily obtained by requesting in our [Discord](https://discord.gg/satflow)) |
+| `SATFLOW_API_KEY` | API key for Satflow marketplace (easily obtained by requesting in our [Discord](https://discord.gg/satflow)) via a support ticket |
 
 ### Optional Variables
 
@@ -131,7 +131,6 @@ For enhanced security, especially in production environments, you can encrypt yo
 
 ## Notes
 
-- This is a starter implementation. Security-hardened logic for handling private keys in production has not been included
 - Always confirm your transactions on test environment or small amounts first to ensure correctness
 - For advanced features (like multi-collection or multi-marketplace), you can expand the logic in `src/index.js`
 

@@ -14,10 +14,6 @@ async function mainLoop() {
   try {
     console.log('\n=== Starting New Cycle ===');
     
-    // Validate environment variables
-    validateBaseEnvironment();
-    await validateWalletEnvironment();
-    
     // Initialize collection managers for each protocol
     const ordinalsManager = new OrdinalsCollectionManager();
     const runesManager = new RunesCollectionManager();
@@ -82,9 +78,48 @@ async function mainLoop() {
   }
 }
 
-// Run the loop on an interval
-const intervalSeconds = Number(process.env.LOOP_SECONDS) || 15;
-setInterval(mainLoop, intervalSeconds * 1000);
+// Get password if using encrypted seed
+async function getWalletPassword() {
+  if (process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
+    const prompts = require('prompts');
+    const { password } = await prompts({
+      type: 'password',
+      name: 'password',
+      message: 'Enter your wallet seed decryption password:',
+    });
 
-// Run immediately on startup
-mainLoop();
+    if (!password) {
+      console.error('Password is required to decrypt the wallet seed');
+      process.exit(1);
+    }
+    return password;
+  }
+  return null;
+}
+
+// Initialize and start the application
+async function init() {
+  try {
+    // Validate base environment first
+    validateBaseEnvironment();
+    
+    // Get password if needed (only once at startup)
+    const password = await getWalletPassword();
+    
+    // Validate wallet environment with password
+    validateWalletEnvironment(password);
+    
+    // Run the loop on an interval
+    const intervalSeconds = Number(process.env.LOOP_SECONDS) || 15;
+    setInterval(() => mainLoop(), intervalSeconds * 1000);
+    
+    // Run immediately on startup
+    mainLoop();
+  } catch (error) {
+    console.error('Initialization error:', error.message);
+    process.exit(1);
+  }
+}
+
+// Start the application
+init();
