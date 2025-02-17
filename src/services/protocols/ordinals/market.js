@@ -8,7 +8,6 @@ async function fetchMarketPrice(collectionSymbol) {
 
     const { data } = await axios.get(url);
     const tokens = data?.tokens || [];
-    const numCheapestItems = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
     
     if (tokens.length === 0) {
       console.log('No listings found');
