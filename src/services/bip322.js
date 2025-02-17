@@ -66,11 +66,6 @@ function signChallenge(challenge, seed) {
       challenge
     );
     
-    // Debug info for signature generation
-    console.error('Signature Generation Debug:');
-    console.error('Challenge:', challenge);
-    console.error('Generated Signature:', signature);
-    
     return signature;
   } catch (error) {
     console.error(`Failed to sign challenge: ${error.message}`);
