@@ -233,7 +233,6 @@ async function processCollection(collectionId, walletItems) {
 }
 
 function validateEnvironment() {
-  const collections = getConfiguredCollections();
   const baseRequired = [
     'LOCAL_WALLET_SEED',
     'SATFLOW_API_KEY',
@@ -247,6 +246,25 @@ function validateEnvironment() {
     console.error('Missing required environment variables:', missing.join(', '));
     process.exit(1);
   }
+
+  // Validate collection-specific bid/list percentages
+  const collections = getConfiguredCollections();
+  collections.forEach(collection => {
+    const bidBelowKey = `${collection.toUpperCase()}_BID_BELOW_PERCENT`;
+    const listAboveKey = `${collection.toUpperCase()}_LIST_ABOVE_PERCENT`;
+    
+    const bidBelowPercent = Number(process.env[bidBelowKey]);
+    if (isNaN(bidBelowPercent) || bidBelowPercent >= 1) {
+      console.error(`${bidBelowKey} must be a number less than 1`);
+      process.exit(1);
+    }
+
+    const listAbovePercent = Number(process.env[listAboveKey]);
+    if (isNaN(listAbovePercent) || listAbovePercent < 1) {
+      console.error(`${listAboveKey} must be a number greater than or equal to 1`);
+      process.exit(1);
+    }
+  });
 
   // Validate UPDATE_THRESHOLD is a valid number between 0 and 1
   const updateThreshold = Number(process.env.UPDATE_THRESHOLD);
