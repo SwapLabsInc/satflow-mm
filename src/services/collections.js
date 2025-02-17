@@ -78,8 +78,25 @@ async function processCollection(collectionId, walletItems) {
   
   // Calculate bidding price and capacity
   const bidBelowPercent = Number(process.env[`${collectionId.toUpperCase()}_BID_BELOW_PERCENT`]) || 0.8;
-  // Round bid price to nearest 1000 sats
-  const bidPriceSats = Math.round(averagePrice * bidBelowPercent / 1000) * 1000;
+  // Support both old and new env var names for backward compatibility
+  const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
+  if (!maxBidToListRatio) {
+    console.error('MAX_BID_TO_LIST_RATIO environment variable is required');
+    process.exit(1);
+  }
+  
+  // Find lowest list price from market data
+  const lowestListPrice = Math.min(...tokens.map(t => t.price));
+  const maxAllowedBidPrice = Math.floor(lowestListPrice * maxBidToListRatio);
+  
+  // Calculate bid price and ensure it's not too high compared to listings
+  let bidPriceSats = Math.round(averagePrice * bidBelowPercent / 1000) * 1000;
+  if (bidPriceSats > maxAllowedBidPrice) {
+    console.log(`\nBid price ${bidPriceSats} sats would exceed maximum ratio of ${maxBidToListRatio * 100}% of lowest list price ${lowestListPrice} sats`);
+    console.log(`Adjusting bid price down to maximum allowed: ${maxAllowedBidPrice} sats`);
+    bidPriceSats = maxAllowedBidPrice;
+  }
+  
   const biddingCapacity = calculateBiddingCapacity(biddingBalance, bidPriceSats);
   
   console.log('\nMarket Analysis:');
@@ -108,18 +125,16 @@ async function processCollection(collectionId, walletItems) {
       // Cancel all bids - we'll create a new right-sized bid after
       bidsToCancel.push(...existingBids.map(bid => bid.bid_id));
     } else {
-      // If under limit, only check for repricing
-      for (const bid of existingBids) {
-        const priceDiff = Math.abs(bid.price - bidPriceSats);
-        const priceChangePercent = (priceDiff / bid.price);
-        
-        if (priceChangePercent > updateThreshold) {
-          console.log(`Bid ${bid.bid_id} needs repricing:`);
-          console.log(`- Current price: ${bid.price} sats`);
-          console.log(`- New price: ${bidPriceSats} sats`);
-          console.log(`- Price change: ${(priceChangePercent * 100).toFixed(2)}%`);
-          bidsToCancel.push(bid.bid_id);
-        }
+      // If under limit, check for repricing
+      const priceDiff = Math.abs(existingBids[0].price - bidPriceSats);
+      const priceChangePercent = (priceDiff / existingBids[0].price);
+      
+      if (priceChangePercent > updateThreshold) {
+        console.log(`Price change of ${(priceChangePercent * 100).toFixed(2)}% exceeds ${updateThreshold * 100}% threshold:`);
+        console.log(`- Current price: ${existingBids[0].price} sats`);
+        console.log(`- New price: ${bidPriceSats} sats`);
+        console.log(`- Affected bids: ${existingBids.length}`);
+        bidsToCancel.push(...existingBids.map(bid => bid.bid_id));
       }
     }
 
@@ -223,7 +238,8 @@ function validateEnvironment() {
     'LOCAL_WALLET_SEED',
     'SATFLOW_API_KEY',
     'COLLECTIONS',
-    'UPDATE_THRESHOLD'
+    'UPDATE_THRESHOLD',
+    'MAX_BID_TO_LIST_RATIO'
   ];
   
   const missing = baseRequired.filter(key => !process.env[key]);
@@ -239,9 +255,17 @@ function validateEnvironment() {
     process.exit(1);
   }
 
+  // Validate MAX_BID_TO_LIST_RATIO is a valid number between 0 and 1
+  const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
+  if (isNaN(maxBidToListRatio) || maxBidToListRatio <= 0 || maxBidToListRatio >= 1) {
+    console.error('MAX_BID_TO_LIST_RATIO must be a number between 0 and 1');
+    process.exit(1);
+  }
+
   console.log('\n=== Configuration ===');
   console.log(`Processing collections: ${collections.join(', ')}`);
   console.log(`Update threshold: ${updateThreshold * 100}%`);
+  console.log(`Max bid/list ratio: ${maxBidToListRatio * 100}%`);
 }
 
 module.exports = {
