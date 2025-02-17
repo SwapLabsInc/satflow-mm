@@ -23,7 +23,7 @@ The application supports both Ordinals collections and Runes:
 |----------|-------------|
 | `COLLECTIONS` | Comma-separated list of collections/runes to process. Format: `collection_name` for Ordinals, `rune:TICKER` for Runes (e.g., "runestone,nodemonkes,rune:DOGGOTOTHEMOON") |
 | `LOCAL_WALLET_SEED` | The seed phrase (private—do not commit) |
-| `SATFLOW_API_KEY` | API key for Satflow marketplace |
+| `SATFLOW_API_KEY` | API key for Satflow marketplace (easily obtained by requesting in our [Discord](https://discord.gg/satflow)) |
 
 ### Optional Variables
 
