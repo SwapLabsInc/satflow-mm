@@ -23,8 +23,8 @@ class RunesCollectionManager extends BaseCollectionManager {
     // Remove any 'rune:' prefix if present
     const envTicker = runeTicker.replace(/^rune:/i, '');
     
-    // Convert to proper case for API (e.g., DOGGOTOTHEMOON -> doggoToTheMoon)
-    const apiTicker = 'doggoToTheMoon';
+    // Keep ticker in original case for API
+    const apiTicker = envTicker;
     
     // Use uppercase for env var names
     const depthKey = `${envTicker}_MARKET_DEPTH_SATS`;
@@ -56,30 +56,50 @@ class RunesCollectionManager extends BaseCollectionManager {
       return;
     }
 
-    console.log(`\nFound ${orders.length} sell orders`);
-
-    const floorPrice = calculateAveragePriceByDepth(orders, depthSats);
-    if (floorPrice <= 0) {
+    // Calculate market depth average price
+    const avgPrice = calculateAveragePriceByDepth(orders, depthSats);
+    if (avgPrice <= 0) {
       console.log(`No valid market data for ${envTicker}`);
       return;
     }
 
-    // Calculate listing price
+    // Calculate listing and bidding prices based on market depth
     const listAbovePercent = Number(process.env[`${envTicker}_LIST_ABOVE_PERCENT`]) || 1.2;
-    const listingPriceSats = floorPrice * listAbovePercent;
+    const listingPriceSats = avgPrice * listAbovePercent;
     
-    // Calculate bidding price
     const bidBelowPercent = Number(process.env[`${envTicker}_BID_BELOW_PERCENT`]) || 0.8;
-    const bidPriceSats = floorPrice * bidBelowPercent;
+    const bidPriceSats = avgPrice * bidBelowPercent;
 
     console.log('\nMarket Analysis:');
-    console.log(`- Floor price: ${floorPrice.toFixed(6)} sats per token`);
+    console.log(`- Market depth: ${depthSats.toLocaleString()} sats`);
+    console.log(`- Average price: ${avgPrice.toFixed(6)} sats per token`);
     console.log(`- Listing price (${(listAbovePercent * 100).toFixed(1)}%): ${listingPriceSats.toFixed(6)} sats per token`);
     console.log(`- Bid price (${(bidBelowPercent * 100).toFixed(1)}%): ${bidPriceSats.toFixed(6)} sats per token`);
 
-    // TODO: Implement runes wallet balance checking
+    // Calculate wallet balance for this rune
     console.log('\nWallet Analysis:');
-    console.log('Runes wallet balance checking not yet implemented');
+    let totalBalance = 0;
+    let runeInfo = null;
+
+    walletItems.forEach(item => {
+      // Match rune ID regardless of formatting (dots vs no dots)
+      if (item.collection?.id.replace(/[•]/g, '') === envTicker.replace(/[•]/g, '') && item.token?.rune_amount) {
+        totalBalance += Number(item.token.rune_amount);
+        if (!runeInfo && item.collection.rune_divisibility !== undefined) {
+          runeInfo = {
+            symbol: item.collection.rune_symbol || '',
+            divisibility: item.collection.rune_divisibility
+          };
+        }
+      }
+    });
+
+    if (totalBalance > 0 && runeInfo) {
+      const formattedBalance = (totalBalance / Math.pow(10, runeInfo.divisibility)).toLocaleString();
+      console.log(`${runeInfo.symbol} Balance: ${formattedBalance} tokens`);
+    } else {
+      console.log('No balance found for this rune');
+    }
 
     // TODO: Implement runes listing
     console.log('\nListing Analysis:');

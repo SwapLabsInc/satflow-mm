@@ -1,68 +1,88 @@
 const axios = require('axios');
 
+/**
+ * Fetches valid sell orders for a rune from Magic Eden
+ * @param {string} runeTicker - The rune's ticker symbol
+ * @returns {Promise<Array>} Array of valid sell orders
+ */
 async function fetchRuneOrders(runeTicker) {
   try {
+    // Get orders sorted by price ascending for optimal market depth calculation
     const url = `https://api-mainnet.magiceden.us/v2/ord/btc/runes/orders/${runeTicker}` +
-      '?offset=0&sort=unitPriceAsc&includePending=false';
+      '?offset=0&sort=unitPriceAsc&includePending=false&side=sell';
 
     const { data } = await axios.get(url);
-    // Filter for sell orders only and valid status
-    return (data?.orders || []).filter(order => 
-      order.side === 'sell' && 
-      order.status === 'valid' &&
-      !order.isPending
-    );
+    
+    // Filter for valid sell orders with proper numeric values
+    return (data?.orders || []).filter(order => {
+      if (!order || order.side !== 'sell' || order.status !== 'valid' || order.isPending) {
+        return false;
+      }
+
+      try {
+        const amount = parseFloat(order.formattedAmount);
+        const unitPrice = parseFloat(order.formattedUnitPrice);
+        return !isNaN(amount) && !isNaN(unitPrice) && amount > 0 && unitPrice > 0;
+      } catch {
+        return false;
+      }
+    });
   } catch (error) {
     console.error(`Rune market price fetch failed: ${error.message}`);
     return [];
   }
 }
 
+/**
+ * Calculates volume-weighted average price for a given market depth
+ * @param {Array} orders - Array of valid sell orders
+ * @param {number} depthSats - Market depth in satoshis to consider
+ * @returns {number} Volume-weighted average price in sats/token
+ */
 function calculateAveragePriceByDepth(orders, depthSats) {
-  if (!orders || orders.length === 0) {
-    console.log('No orders found');
-    return 0;
-  }
+  if (!orders || orders.length === 0) return 0;
 
-  // Sort orders by unit price ascending (cheapest first)
-  const sortedOrders = orders.sort((a, b) => 
-    parseFloat(a.formattedUnitPrice) - parseFloat(b.formattedUnitPrice)
-  );
-  
-  console.log('\nOrder Book Analysis:');
+  // Ensure orders are sorted by price ascending
+  const sortedOrders = [...orders].sort((a, b) => {
+    const priceA = parseFloat(a.formattedUnitPrice);
+    const priceB = parseFloat(b.formattedUnitPrice);
+    if (isNaN(priceA)) return 1;
+    if (isNaN(priceB)) return -1;
+    return priceA - priceB;
+  });
+
   let totalTokens = 0;
-  let totalValue = 0;
+  let weightedPriceSum = 0;
   let depthRemaining = depthSats;
 
+  // Calculate weighted average price up to the specified depth
   for (const order of sortedOrders) {
-    // Use formattedAmount and formattedUnitPrice for calculations
+    if (depthRemaining <= 0) break;
+
     const tokens = parseFloat(order.formattedAmount);
     const unitPrice = parseFloat(order.formattedUnitPrice);
-    const orderValue = order.price; // Use the actual order value in sats
-    
-    console.log(`- ${tokens.toLocaleString()} tokens at ${unitPrice.toFixed(6)} sats/token = ${orderValue.toLocaleString()} sats total`);
-    
-    if (depthRemaining > 0) {
-      if (orderValue <= depthRemaining) {
-        // Include entire order
-        totalTokens += tokens;
-        totalValue += orderValue;
-        depthRemaining -= orderValue;
-      } else {
-        // Include partial order
-        const fraction = depthRemaining / orderValue;
-        const partialTokens = tokens * fraction;
-        totalTokens += partialTokens;
-        totalValue += depthRemaining;
-        depthRemaining = 0;
-      }
+    const orderValue = tokens * unitPrice;
+
+    // Determine how much of the order to include
+    let tokensToConsider;
+    let satsToSpend;
+
+    if (orderValue <= depthRemaining) {
+      // Include entire order
+      tokensToConsider = tokens;
+      satsToSpend = orderValue;
+    } else {
+      // Partially fill order to reach depth
+      tokensToConsider = depthRemaining / unitPrice;
+      satsToSpend = depthRemaining;
     }
+
+    totalTokens += tokensToConsider;
+    weightedPriceSum += unitPrice * tokensToConsider;
+    depthRemaining -= satsToSpend;
   }
 
-  if (totalTokens === 0) return 0;
-
-  // Return the unit price of the cheapest order
-  return parseFloat(sortedOrders[0].formattedUnitPrice);
+  return totalTokens > 0 ? weightedPriceSum / totalTokens : 0;
 }
 
 module.exports = {

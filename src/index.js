@@ -39,16 +39,19 @@ async function mainLoop() {
       // Get bidding wallet info
       biddingAddress = await ordinalsManager.biddingService.getBiddingWalletAddress();
       biddingBalance = await ordinalsManager.biddingService.getBiddingWalletBalance(biddingAddress);
-      console.log(`Bidding wallet balance: ${biddingBalance} sats`);
+      console.log(`Satflow Bidding wallet balance: ${biddingBalance} sats`);
     } catch (error) {
-      console.error(`Bidding wallet error: ${error.message}`);
+      console.error(`Satflow Bidding wallet error: ${error.message}`);
       return;
     }
     
     // Fetch wallet contents once for all collections
-    const walletItems = await fetchWalletContents();
-    if (!walletItems || !Array.isArray(walletItems)) {
-      throw new Error('Invalid wallet items response');
+    const { ordinals, runes } = await fetchWalletContents();
+    if (!ordinals || !Array.isArray(ordinals)) {
+      throw new Error('Invalid ordinals response from Satflow');
+    }
+    if (!runes || !Array.isArray(runes)) {
+      throw new Error('Invalid runes response from Satflow');
     }
 
     // Get all configured collections
@@ -56,15 +59,16 @@ async function mainLoop() {
       .map(c => c.trim())
       .filter(c => c.length > 0);
     
+    // Process collections based on type
     for (const collection of collections) {
       try {
         if (collection.toLowerCase().startsWith('rune:')) {
           // Process rune collection
           const runeTicker = collection.substring(5); // Remove 'rune:' prefix
-          await runesManager.processCollection(runeTicker, walletItems);
+          await runesManager.processCollection(runeTicker, runes);
         } else {
           // Process ordinals collection
-          await ordinalsManager.processCollection(collection, walletItems, biddingAddress, biddingBalance);
+          await ordinalsManager.processCollection(collection, ordinals, biddingAddress, biddingBalance);
         }
       } catch (error) {
         console.error(`Error processing ${collection}:`, error.message);
