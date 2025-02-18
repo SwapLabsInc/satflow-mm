@@ -137,25 +137,21 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         const currentBidsTotal = existingBids[0]?.price * existingBids.length || 0;
         const availableForBidding = collectionLimit - currentBidsTotal;
         
-        if (availableForBidding > bidPriceSats) {
-          const maxQuantityByLimit = Math.floor(availableForBidding / bidPriceSats);
-          const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
-          
-          if (finalBidQuantity > 0) {
-            console.log(`\nCollection limit increased - cancelling existing bids to create larger bid...`);
-            try {
-              // Cancel all existing bids first
-              await this.biddingService.cancelBids(existingBids.map(bid => bid.bid_id));
-              
-              // Calculate new bid quantity based on full collection limit
-              const maxNewQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
-              const finalNewQuantity = Math.min(biddingCapacity, maxNewQuantityByLimit);
-              
-              console.log(`Creating new bid at ${bidPriceSats} sats for ${finalNewQuantity} items...`);
-              await this.biddingService.createBid(collectionId, bidPriceSats, finalNewQuantity);
-            } catch (error) {
-              console.error('Failed to update bids:', error.message);
-            }
+        // Calculate potential new bid quantity using full collection limit
+        const maxNewQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
+        const potentialNewQuantity = Math.min(biddingCapacity, maxNewQuantityByLimit);
+        
+        // Only proceed if we can create more bids than we currently have
+        if (potentialNewQuantity > existingBids.length) {
+          console.log(`\nCollection limit allows for ${potentialNewQuantity} bids (currently have ${existingBids.length})`);
+          try {
+            // Cancel all existing bids first
+            await this.biddingService.cancelBids(existingBids.map(bid => bid.bid_id));
+            
+            console.log(`Creating new bid at ${bidPriceSats} sats for ${potentialNewQuantity} items...`);
+            await this.biddingService.createBid(collectionId, bidPriceSats, potentialNewQuantity);
+          } catch (error) {
+            console.error('Failed to update bids:', error.message);
           }
         }
       }
