@@ -142,8 +142,20 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
           
           if (finalBidQuantity > 0) {
-            console.log(`\nCollection limit increased - creating additional bid at ${bidPriceSats} sats for ${finalBidQuantity} items...`);
-            await this.biddingService.createBid(collectionId, bidPriceSats, finalBidQuantity);
+            console.log(`\nCollection limit increased - cancelling existing bids to create larger bid...`);
+            try {
+              // Cancel all existing bids first
+              await this.biddingService.cancelBids(existingBids.map(bid => bid.bid_id));
+              
+              // Calculate new bid quantity based on full collection limit
+              const maxNewQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
+              const finalNewQuantity = Math.min(biddingCapacity, maxNewQuantityByLimit);
+              
+              console.log(`Creating new bid at ${bidPriceSats} sats for ${finalNewQuantity} items...`);
+              await this.biddingService.createBid(collectionId, bidPriceSats, finalNewQuantity);
+            } catch (error) {
+              console.error('Failed to update bids:', error.message);
+            }
           }
         }
       }
