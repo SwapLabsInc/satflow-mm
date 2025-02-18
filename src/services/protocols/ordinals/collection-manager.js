@@ -132,6 +132,20 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         } catch (error) {
           console.error('Failed to update bids:', error.message);
         }
+      } else {
+        // Check if we can create additional bids within the new collection limit
+        const currentBidsTotal = existingBids[0]?.price * existingBids.length || 0;
+        const availableForBidding = collectionLimit - currentBidsTotal;
+        
+        if (availableForBidding > bidPriceSats) {
+          const maxQuantityByLimit = Math.floor(availableForBidding / bidPriceSats);
+          const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
+          
+          if (finalBidQuantity > 0) {
+            console.log(`\nCollection limit increased - creating additional bid at ${bidPriceSats} sats for ${finalBidQuantity} items...`);
+            await this.biddingService.createBid(collectionId, bidPriceSats, finalBidQuantity);
+          }
+        }
       }
     }
 
