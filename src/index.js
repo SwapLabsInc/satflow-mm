@@ -33,12 +33,13 @@ async function mainLoop() {
         throw new Error('Local signature verification failed');
       }
 
-      // Store signature in bidding service for this cycle
+      // Store signature in bidding services for this cycle
       ordinalsManager.biddingService.setSignature(signature);
+      runesManager.biddingService.setSignature(signature);
 
-      // Get bidding wallet info
-      biddingAddress = await ordinalsManager.biddingService.getBiddingWalletAddress();
-      biddingBalance = await ordinalsManager.biddingService.getBiddingWalletBalance(biddingAddress);
+      // Get bidding wallet info (can use either service since they share the same wallet)
+      biddingAddress = await runesManager.biddingService.getBiddingWalletAddress();
+      biddingBalance = await runesManager.biddingService.getBiddingWalletBalance(biddingAddress);
       console.log(`Satflow Bidding wallet balance: ${biddingBalance} sats`);
     } catch (error) {
       console.error(`Satflow Bidding wallet error: ${error.message}`);

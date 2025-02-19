@@ -15,12 +15,19 @@ async function listOnSatflow(item, listingPriceSats) {
     // Step 1: Get the unsigned PSBT from Satflow
     const intentSellPayload = {
       price: listingPriceSats,
-      inscription_id: item.token.inscription_id,
-      collection_slug: item.collection.id,
       ord_address: walletDetails.address,
       receive_address: walletDetails.address,
       tap_key: walletDetails.tapKey
     };
+
+    // For runes, use inscription_id as runes_output (it's actually the UTXO ID)
+    // For ordinals, use inscription_id and collection_slug as normal
+    if (item.token.rune_amount) {
+      intentSellPayload.runes_output = item.token.inscription_id;
+    } else {
+      intentSellPayload.inscription_id = item.token.inscription_id;
+      intentSellPayload.collection_slug = item.collection.id;
+    }
 
     const intentRes = await axios.post(
       'https://native.satflow.com/intent/sell',
@@ -63,11 +70,16 @@ async function listOnSatflow(item, listingPriceSats) {
       signed_secure_listing_psbts: signedSecureListingPSBTs,
       listings: [{
         price: listingPriceSats,
-        inscription_id: item.token.inscription_id,
-        collection_slug: item.collection.id,
         ord_address: walletDetails.address,
         receive_address: walletDetails.address,
-        tap_key: walletDetails.tapKey
+        tap_key: walletDetails.tapKey,
+        ...(item.token.rune_amount 
+          ? { runes_output: item.token.inscription_id }
+          : { 
+              inscription_id: item.token.inscription_id,
+              collection_slug: item.collection.id
+            }
+        )
       }]
     };
 
