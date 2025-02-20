@@ -31,6 +31,7 @@ The application supports both Ordinals collections and Runes:
 |----------|-------------|---------|
 | `LOOP_SECONDS` | Interval (in seconds) for each run | 15 |
 | `UPDATE_THRESHOLD` | Minimum price difference (as decimal) required before updating listings/bids | 0.01 (1%) |
+| `IGNORED_MARKET_ADDRESSES` | Comma-separated list of wallet addresses whose listings should be excluded from price calculations | - |
 | `ZENROWS_API_KEY` | API key for ZenRows (used to proxy or scrape data from Magic Eden) | - |
 
 ### Collection-Specific Variables
