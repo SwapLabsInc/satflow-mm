@@ -1,5 +1,36 @@
 const { decrypt } = require('./encryption');
 
+// Helper function to parse and validate bid ladder configuration
+function parseBidLadder(ladderString) {
+  if (!ladderString) return null;
+  
+  try {
+    const steps = ladderString.split(',').map(step => {
+      const [pricePercent, allocation] = step.split(':').map(Number);
+      if (isNaN(pricePercent) || isNaN(allocation)) {
+        throw new Error('Invalid format - each step must be pricePercent:allocation');
+      }
+      if (pricePercent <= 0 || pricePercent >= 1) {
+        throw new Error('Price percent must be between 0 and 1');
+      }
+      if (allocation <= 0 || allocation > 1) {
+        throw new Error('Allocation must be between 0 and 1');
+      }
+      return { pricePercent, allocation };
+    });
+    
+    // Validate total allocation doesn't exceed 100%
+    const totalAllocation = steps.reduce((sum, step) => sum + step.allocation, 0);
+    if (totalAllocation > 1.001) { // Allow for small floating point errors
+      throw new Error(`Total allocation (${(totalAllocation * 100).toFixed(1)}%) exceeds 100%`);
+    }
+    
+    return steps;
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
 function validateWalletEnvironment(password) {
   // Check for either encrypted or plaintext seed
   if (!process.env.LOCAL_WALLET_SEED && !process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
@@ -51,19 +82,32 @@ function validateBaseEnvironment() {
 
   // Validate collection-specific bid/list percentages for Ordinals
   ordinalCollections.forEach(collection => {
-    const bidBelowKey = `${collection.toUpperCase()}_BID_BELOW_PERCENT`;
-    const listAboveKey = `${collection.toUpperCase()}_LIST_ABOVE_PERCENT`;
+    const collectionUpper = collection.toUpperCase();
+    const bidBelowKey = `${collectionUpper}_BID_BELOW_PERCENT`;
+    const listAboveKey = `${collectionUpper}_LIST_ABOVE_PERCENT`;
+    const bidLadderKey = `${collectionUpper}_BID_LADDER`;
     
+    // Validate bid below percent if present
     const bidBelowPercent = Number(process.env[bidBelowKey]);
     if (process.env[bidBelowKey] && (isNaN(bidBelowPercent) || bidBelowPercent >= 1)) {
       console.error(`${bidBelowKey} must be a number less than 1`);
       process.exit(1);
     }
 
+    // Validate list above percent if present
     const listAbovePercent = Number(process.env[listAboveKey]);
     if (process.env[listAboveKey] && (isNaN(listAbovePercent) || listAbovePercent < 1)) {
       console.error(`${listAboveKey} must be a number greater than or equal to 1`);
       process.exit(1);
+    }
+    
+    // Validate bid ladder if present
+    if (process.env[bidLadderKey]) {
+      const ladderResult = parseBidLadder(process.env[bidLadderKey]);
+      if (ladderResult && ladderResult.error) {
+        console.error(`${bidLadderKey}: ${ladderResult.error}`);
+        process.exit(1);
+      }
     }
   });
 
@@ -71,6 +115,7 @@ function validateBaseEnvironment() {
   runeCollections.forEach(ticker => {
     const bidBelowKey = `${ticker}_BID_BELOW_PERCENT`;
     const listAboveKey = `${ticker}_LIST_ABOVE_PERCENT`;
+    const bidLadderKey = `${ticker}_BID_LADDER`;
     
     const bidBelowPercent = Number(process.env[bidBelowKey]);
     if (process.env[bidBelowKey] && (isNaN(bidBelowPercent) || bidBelowPercent >= 1)) {
@@ -82,6 +127,15 @@ function validateBaseEnvironment() {
     if (process.env[listAboveKey] && (isNaN(listAbovePercent) || listAbovePercent < 1)) {
       console.error(`${listAboveKey} must be a number greater than or equal to 1`);
       process.exit(1);
+    }
+    
+    // Validate bid ladder if present
+    if (process.env[bidLadderKey]) {
+      const ladderResult = parseBidLadder(process.env[bidLadderKey]);
+      if (ladderResult && ladderResult.error) {
+        console.error(`${bidLadderKey}: ${ladderResult.error}`);
+        process.exit(1);
+      }
     }
   });
 
@@ -102,5 +156,6 @@ function validateBaseEnvironment() {
 
 module.exports = {
   validateBaseEnvironment,
-  validateWalletEnvironment
+  validateWalletEnvironment,
+  parseBidLadder
 };

@@ -42,7 +42,8 @@ For Ordinals collections (e.g., RUNESTONE, NODEMONKES), the following optional v
 |----------|-------------|---------|
 | `{COLLECTION}_NUM_CHEAPEST_ITEMS` | Number of cheapest items to average in price calculation | 10 |
 | `{COLLECTION}_LIST_ABOVE_PERCENT` | Multiplier to list above the average price (e.g., 1.2 = 120% of average) | 1.2 |
-| `{COLLECTION}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | Not implemented yet |
+| `{COLLECTION}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | 0.8 |
+| `{COLLECTION}_BID_LADDER` | Alternative to BID_BELOW_PERCENT: Defines multiple price points with allocations (e.g., "0.9:0.2,0.85:0.3,0.8:0.5") | - |
 | `{COLLECTION}_MAX_BID_TOTAL` | Maximum total amount in sats to bid on this collection | Infinity |
 | `PREMIUM_INSCRIPTION_{INSCRIPTION_ID}` | Inscription-specific listing multiplier that overrides the collection's LIST_ABOVE_PERCENT (e.g., 1.2 = 120% of average) | - |
 
@@ -54,7 +55,8 @@ For Runes (e.g., DOGGOTOTHEMOON), the following variables can be set:
 |----------|-------------|---------|
 | `{RUNE_TICKER}_MARKET_DEPTH_SATS` | **Required**: Market depth in sats for price calculation (e.g., 10000000 for 10M sats depth) | - |
 | `{RUNE_TICKER}_LIST_ABOVE_PERCENT` | Multiplier to list above the average price (e.g., 1.2 = 120% of average) | 1.2 |
-| `{RUNE_TICKER}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | Not implemented yet |
+| `{RUNE_TICKER}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | 0.8 |
+| `{RUNE_TICKER}_BID_LADDER` | Alternative to BID_BELOW_PERCENT: Defines multiple price points with allocations (e.g., "0.9:0.2,0.85:0.3,0.8:0.5") | - |
 | `{RUNE_TICKER}_MAX_BID_TOTAL` | Maximum total amount in sats to bid on this rune | Infinity |
 
 ### Premium Inscription Pricing
@@ -124,11 +126,21 @@ For enhanced security, especially in production environments, you can encrypt yo
 
 4. **List Items**: The bot checks your wallet on Satflow, sees which items you hold, and lists them using your desired markup (configurable via `{COLLECTION/RUNE}_LIST_ABOVE_PERCENT`).
 
-5. **(Future) Bid Items**: Logic for bidding below average (`{COLLECTION/RUNE}_BID_BELOW_PERCENT`) will be added later.
+5. **Bid Items**: The bot places bids on items using one of two strategies:
+   - **Single Price Strategy**: Places bids at a single price point below the average market price (configurable via `{COLLECTION/RUNE}_BID_BELOW_PERCENT`)
+   - **Ladder Price Strategy**: Places bids at multiple price points with different allocations of your bidding budget (configurable via `{COLLECTION/RUNE}_BID_LADDER`)
 
 6. **Price Update Threshold**: The bot only updates listings and bids when the price difference exceeds the configured threshold (`UPDATE_THRESHOLD`). For example, with a threshold of 0.01 (1%), a listing at 100,000 sats will only be updated if the new price differs by more than 1,000 sats. This helps reduce the number of updates sent to marketplaces and improves overall market health.
 
-7. **Modularity**: The code supports multiple collections and runes, and is written to extend to multiple marketplaces in the future.
+7. **Ladder Pricing**: When using the ladder pricing strategy, the bot distributes your bidding budget across multiple price points. For example, with a ladder configuration of "0.9:0.2,0.85:0.3,0.8:0.5", the bot will:
+   - Place 20% of your budget at 90% of the average price
+   - Place 30% of your budget at 85% of the average price
+   - Place 50% of your budget at 80% of the average price
+   This creates a more sophisticated market making strategy that can capture more trades at different price points.
+
+   **Note for Ordinals**: Due to Satflow API requirements, all Ordinals bid prices are automatically rounded to 1000 sat increments (e.g., 3,000, 4,000, 5,000 sats). This rounding is handled automatically by the bot.
+
+8. **Modularity**: The code supports multiple collections and runes, and is written to extend to multiple marketplaces in the future.
 
 ## Notes
 

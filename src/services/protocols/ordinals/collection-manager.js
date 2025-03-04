@@ -2,6 +2,7 @@ const { BaseCollectionManager } = require('../../core/collection-manager');
 const { OrdinalsBiddingService } = require('./bidding');
 const { fetchMarketPrice, calculateAveragePrice } = require('./market');
 const { listOnSatflow } = require('../../listings');
+const { parseBidLadder } = require('../../core/environment');
 
 class OrdinalsCollectionManager extends BaseCollectionManager {
   constructor() {
@@ -60,115 +61,266 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     const listAbovePercent = Number(process.env[`${collectionId.toUpperCase()}_LIST_ABOVE_PERCENT`]) || 1.2;
     const listingPriceSats = Math.floor(averagePrice * listAbovePercent);
     
-    // Calculate bidding price and capacity
-    const bidBelowPercent = Number(process.env[`${collectionId.toUpperCase()}_BID_BELOW_PERCENT`]) || 0.8;
+    // Get max bid to list ratio
     const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
     
     // Find lowest list price from market data
     const lowestListPrice = Math.min(...tokens.map(t => t.price));
     const maxAllowedBidPrice = Math.floor(lowestListPrice * maxBidToListRatio);
     
-    // Calculate bid price and ensure it's not too high compared to listings
-    let bidPriceSats = Math.round(averagePrice * bidBelowPercent / 1000) * 1000;
-    if (bidPriceSats > maxAllowedBidPrice) {
-      console.log(`\nBid price ${bidPriceSats} sats would exceed maximum ratio of ${maxBidToListRatio * 100}% of lowest list price ${lowestListPrice} sats`);
-      console.log(`Adjusting bid price down to maximum allowed: ${maxAllowedBidPrice} sats`);
-      bidPriceSats = maxAllowedBidPrice;
-    }
+    // Check for bid ladder configuration
+    const collectionUpper = collectionId.toUpperCase();
+    const bidLadderConfig = parseBidLadder(process.env[`${collectionUpper}_BID_LADDER`]);
     
-    const biddingCapacity = this.calculateBiddingCapacity(biddingBalance, bidPriceSats);
+    // Collection limit for bidding
+    const collectionLimit = this.getCollectionBidLimit(collectionId);
     
     console.log('\nMarket Analysis:');
     console.log(`- Average price: ${averagePrice} sats`);
     console.log(`- Listing price (${listAbovePercent}x): ${listingPriceSats} sats`);
-    console.log(`- Bid price (${bidBelowPercent}x): ${bidPriceSats} sats`);
-    console.log(`- Can bid on: ${biddingCapacity} items at ${bidPriceSats} sats each`);
+    console.log(`- Collection bid limit: ${collectionLimit} sats`);
+    
+    // Determine bidding strategy (ladder or single price)
+    let bidStrategy;
+    
+    if (bidLadderConfig) {
+      // Ladder pricing strategy - calculate steps with budget constraints
+      
+      // First pass: calculate prices
+      const stepsWithPrices = bidLadderConfig.map(step => {
+        // Calculate price for this step
+        // IMPORTANT: For Ordinals, Satflow API requires prices to be in 1000 sat increments
+        let price = Math.round(averagePrice * step.pricePercent / 1000) * 1000;
+        
+        // Ensure price is at least 1000 sats to avoid division issues
+        // This is also required by Satflow API for Ordinals
+        price = Math.max(price, 1000);
+        
+        // Ensure price doesn't exceed max allowed
+        if (price > maxAllowedBidPrice) {
+          // Round down to nearest 1000 sats to comply with Satflow API requirements
+          price = Math.floor(maxAllowedBidPrice / 1000) * 1000;
+        }
+        
+        return {
+          pricePercent: step.pricePercent,
+          allocation: step.allocation,
+          price,
+          // Quantity will be calculated later
+          quantity: 0
+        };
+      });
+      
+      // Calculate total allocation (should be 1.0 but might have rounding errors)
+      const totalAllocation = stepsWithPrices.reduce((sum, step) => sum + step.allocation, 0);
+      
+      // Calculate how many items we can afford at each price point
+      const maxItemsByPrice = stepsWithPrices.map(step => {
+        // Calculate max items we could buy at this price with entire balance
+        return Math.floor(biddingBalance / step.price);
+      });
+      
+      // Calculate total items we could buy if we distributed evenly by allocation
+      const totalPossibleItems = maxItemsByPrice.reduce((sum, maxItems, index) => {
+        // How many items this step would get based on its allocation percentage
+        const itemsForStep = Math.floor(maxItems * (stepsWithPrices[index].allocation / totalAllocation));
+        return sum + itemsForStep;
+      }, 0);
+      
+      // Now distribute the items according to allocation percentages
+      let remainingBalance = biddingBalance;
+      const finalSteps = stepsWithPrices.map((step, index) => {
+        // Calculate target quantity based on allocation
+        const targetQuantity = Math.floor(maxItemsByPrice[index] * (step.allocation / totalAllocation));
+        
+        // Ensure we don't exceed remaining balance
+        const maxQuantityWithBalance = Math.floor(remainingBalance / step.price);
+        const finalQuantity = Math.min(targetQuantity, maxQuantityWithBalance);
+        
+        // Update remaining balance
+        const totalCost = finalQuantity * step.price;
+        remainingBalance -= totalCost;
+        
+        return {
+          ...step,
+          quantity: isFinite(finalQuantity) ? finalQuantity : 0,
+          totalCost
+        };
+      });
+      
+      bidStrategy = {
+        type: 'ladder',
+        steps: finalSteps
+      };
+      
+      console.log('- Using ladder pricing strategy:');
+      bidStrategy.steps.forEach((step, index) => {
+        console.log(`  Step ${index + 1}: ${step.price} sats (${(step.pricePercent * 100).toFixed(1)}% of avg) - ${step.quantity} items (${(step.allocation * 100).toFixed(1)}% allocation)`);
+      });
+      
+      // Calculate total items across all steps
+      const totalItems = bidStrategy.steps.reduce((sum, step) => sum + step.quantity, 0);
+      console.log(`- Total items across ladder: ${totalItems}`);
+    } else {
+      // Single price strategy (backward compatibility)
+      const bidBelowPercent = Number(process.env[`${collectionUpper}_BID_BELOW_PERCENT`]) || 0.8;
+      
+      // Calculate bid price and ensure it's not too high compared to listings
+      // IMPORTANT: For Ordinals, Satflow API requires prices to be in 1000 sat increments
+      let bidPriceSats = Math.round(averagePrice * bidBelowPercent / 1000) * 1000;
+      if (bidPriceSats > maxAllowedBidPrice) {
+        console.log(`\nBid price ${bidPriceSats} sats would exceed maximum ratio of ${maxBidToListRatio * 100}% of lowest list price ${lowestListPrice} sats`);
+        console.log(`Adjusting bid price down to maximum allowed: ${maxAllowedBidPrice} sats`);
+        // Round down to nearest 1000 sats to comply with Satflow API requirements
+        bidPriceSats = Math.floor(maxAllowedBidPrice / 1000) * 1000;
+      }
+      
+      const biddingCapacity = this.calculateBiddingCapacity(biddingBalance, bidPriceSats);
+      const maxQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
+      const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
+      
+      bidStrategy = {
+        type: 'single',
+        price: bidPriceSats,
+        percent: bidBelowPercent,
+        quantity: finalBidQuantity
+      };
+      
+      console.log(`- Using single price strategy: ${bidPriceSats} sats (${bidBelowPercent * 100}% of avg)`);
+      console.log(`- Can bid on: ${finalBidQuantity} items at ${bidPriceSats} sats each`);
+    }
 
     // Get update threshold from environment
     const updateThreshold = Number(process.env.UPDATE_THRESHOLD) || 0.01;
 
-    // Check if existing bids need to be repriced or exceed limit
+    // Always cancel existing bids when using ladder pricing or when price change exceeds threshold
+    let shouldCancelBids = false;
+    
     if (existingBids.length > 0) {
       console.log('\nChecking bids for repricing and limit compliance:');
-      const bidsToCancel = [];
-      const collectionLimit = this.getCollectionBidLimit(collectionId);
       
       // Calculate total of all bids
-      const totalBidAmount = existingBids[0].price * existingBids.length;
+      const totalBidAmount = existingBids.reduce((sum, bid) => sum + bid.price, 0);
       
       if (totalBidAmount > collectionLimit) {
         console.log(`\nTotal bid amount ${totalBidAmount} exceeds collection limit ${collectionLimit}`);
-        bidsToCancel.push(...existingBids.map(bid => bid.bid_id));
+        shouldCancelBids = true;
+      } else if (bidStrategy.type === 'ladder') {
+        // Check if we need to update ladder bids
+        // First, determine if existing bids match our current ladder strategy
+        const existingBidPrices = existingBids.map(bid => bid.price);
+        const currentLadderPrices = bidStrategy.steps
+          .filter(step => step.quantity > 0)
+          .map(step => Math.round(step.price / 1000) * 1000); // Ensure rounding to 1000 sats
+        
+        // Count bids at each price point
+        const existingBidCounts = {};
+        existingBidPrices.forEach(price => {
+          existingBidCounts[price] = (existingBidCounts[price] || 0) + 1;
+        });
+        
+        // Check if the ladder structure has changed
+        let ladderChanged = false;
+        
+        // Check if we have the same price points
+        const existingPricePoints = Object.keys(existingBidCounts).map(Number).sort((a, b) => b - a);
+        const newPricePoints = [...new Set(currentLadderPrices)].sort((a, b) => b - a);
+        
+        if (existingPricePoints.length !== newPricePoints.length) {
+          console.log('Ladder structure changed: different number of price points');
+          ladderChanged = true;
+        } else {
+          // Check if price points have changed beyond threshold
+          for (let i = 0; i < existingPricePoints.length; i++) {
+            const priceDiff = Math.abs(existingPricePoints[i] - newPricePoints[i]);
+            const priceChangePercent = priceDiff / existingPricePoints[i];
+            
+            if (priceChangePercent > updateThreshold) {
+              console.log(`Ladder price point ${i+1} changed by ${(priceChangePercent * 100).toFixed(2)}%, exceeding ${updateThreshold * 100}% threshold`);
+              ladderChanged = true;
+              break;
+            }
+          }
+          
+          // Check if distribution has changed
+          if (!ladderChanged) {
+            for (const price of newPricePoints) {
+              const closestExistingPrice = existingPricePoints.reduce((closest, existingPrice) => {
+                return Math.abs(existingPrice - price) < Math.abs(closest - price) ? existingPrice : closest;
+              });
+              
+              const existingCount = existingBidCounts[closestExistingPrice] || 0;
+              const newCount = bidStrategy.steps.filter(step => 
+                Math.round(step.price / 1000) * 1000 === price
+              ).reduce((sum, step) => sum + step.quantity, 0);
+              
+              const countDiff = Math.abs(existingCount - newCount);
+              if (countDiff > 1) { // Allow for small differences
+                console.log(`Bid distribution changed at price ${price}: was ${existingCount}, now ${newCount}`);
+                ladderChanged = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (ladderChanged) {
+          console.log('Ladder pricing structure or distribution has changed - need to cancel existing bids');
+          shouldCancelBids = true;
+        } else {
+          console.log('Ladder pricing structure and distribution unchanged - keeping existing bids');
+        }
       } else {
-        const priceDiff = Math.abs(existingBids[0].price - bidPriceSats);
+        // For single price strategy, check if price change exceeds threshold
+        const priceDiff = Math.abs(existingBids[0].price - bidStrategy.price);
         const priceChangePercent = (priceDiff / existingBids[0].price);
         
         if (priceChangePercent > updateThreshold) {
           console.log(`Price change of ${(priceChangePercent * 100).toFixed(2)}% exceeds ${updateThreshold * 100}% threshold:`);
           console.log(`- Current price: ${existingBids[0].price} sats`);
-          console.log(`- New price: ${bidPriceSats} sats`);
+          console.log(`- New price: ${bidStrategy.price} sats`);
           console.log(`- Affected bids: ${existingBids.length}`);
-          bidsToCancel.push(...existingBids.map(bid => bid.bid_id));
-        }
-      }
-
-      if (bidsToCancel.length > 0) {
-        try {
-          await this.biddingService.cancelBids(bidsToCancel);
-          
-          // Create new bid at updated price, respecting collection bid limit
-          const remainingBids = existingBids.filter(bid => !bidsToCancel.includes(bid.bid_id));
-          const remainingBidsTotal = remainingBids[0]?.price * remainingBids.length || 0;
-          const availableForBidding = collectionLimit - remainingBidsTotal;
-          const maxQuantityByLimit = Math.floor(availableForBidding / bidPriceSats);
-          const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
-
-          if (finalBidQuantity > 0) {
-            console.log(`Creating new bid at ${bidPriceSats} sats for ${finalBidQuantity} items...`);
-            await this.biddingService.createBid(collectionId, bidPriceSats, finalBidQuantity);
-          } else {
-            console.log('Cannot create new bid: would exceed collection bid limit');
-          }
-        } catch (error) {
-          console.error('Failed to update bids:', error.message);
-        }
-      } else {
-        // Check if we can create additional bids within the new collection limit
-        const currentBidsTotal = existingBids[0]?.price * existingBids.length || 0;
-        const availableForBidding = collectionLimit - currentBidsTotal;
-        
-        // Calculate potential new bid quantity using full collection limit
-        const maxNewQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
-        const potentialNewQuantity = Math.min(biddingCapacity, maxNewQuantityByLimit);
-        
-        // Only proceed if we can create more bids than we currently have
-        if (potentialNewQuantity > existingBids.length) {
-          console.log(`\nCollection limit allows for ${potentialNewQuantity} bids (currently have ${existingBids.length})`);
-          try {
-            // Cancel all existing bids first
-            await this.biddingService.cancelBids(existingBids.map(bid => bid.bid_id));
-            
-            console.log(`Creating new bid at ${bidPriceSats} sats for ${potentialNewQuantity} items...`);
-            await this.biddingService.createBid(collectionId, bidPriceSats, potentialNewQuantity);
-          } catch (error) {
-            console.error('Failed to update bids:', error.message);
-          }
+          shouldCancelBids = true;
         }
       }
     }
 
-    // If no existing bids and we have bidding capacity, create a new bid
-    if (existingBids.length === 0 && biddingCapacity > 0) {
+    // Cancel bids if needed
+    if (existingBids.length > 0 && shouldCancelBids) {
       try {
-        const collectionLimit = this.getCollectionBidLimit(collectionId);
-        const maxQuantityByLimit = Math.floor(collectionLimit / bidPriceSats);
-        const finalBidQuantity = Math.min(biddingCapacity, maxQuantityByLimit);
+        const bidIds = existingBids.map(bid => bid.bid_id);
+        await this.biddingService.cancelBids(bidIds);
+        console.log(`Cancelled ${bidIds.length} existing bids`);
+        existingBids = []; // Clear existing bids after cancellation
+      } catch (error) {
+        console.error('Failed to cancel bids:', error.message);
+      }
+    }
 
-        if (finalBidQuantity > 0) {
-          console.log(`\nCreating new bid at ${bidPriceSats} sats for ${finalBidQuantity} items...`);
-          await this.biddingService.createBid(collectionId, bidPriceSats, finalBidQuantity);
+    // Create new bids if we have no existing bids
+    if (existingBids.length === 0) {
+      try {
+        if (bidStrategy.type === 'ladder') {
+          // Create ladder bids
+          console.log('\nCreating ladder bids:');
+          for (const step of bidStrategy.steps) {
+            if (step.quantity > 0) {
+              // Ensure price is rounded to 1000 sat increments for Satflow API
+              const roundedPrice = Math.round(step.price / 1000) * 1000;
+              console.log(`- Creating bid at ${roundedPrice} sats for ${step.quantity} items (${(step.pricePercent * 100).toFixed(1)}% of avg)...`);
+              await this.biddingService.createBid(collectionId, roundedPrice, step.quantity);
+            }
+          }
         } else {
-          console.log('\nCannot create new bid: would exceed collection bid limit');
+          // Create single price bid
+          if (bidStrategy.quantity > 0) {
+            // Ensure price is rounded to 1000 sat increments for Satflow API
+            const roundedPrice = Math.round(bidStrategy.price / 1000) * 1000;
+            console.log(`\nCreating new bid at ${roundedPrice} sats for ${bidStrategy.quantity} items...`);
+            await this.biddingService.createBid(collectionId, roundedPrice, bidStrategy.quantity);
+          } else {
+            console.log('\nCannot create new bid: would exceed collection bid limit or insufficient balance');
+          }
         }
       } catch (error) {
         console.error('Failed to create bid:', error.message);
