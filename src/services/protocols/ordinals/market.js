@@ -32,7 +32,7 @@ async function fetchMarketPrice(collectionSymbol) {
       (async () => {
         const url = 'https://api-mainnet.magiceden.us/v2/ord/btc/tokens?' +
           `offset=0&limit=100&collectionSymbol[]=${collectionSymbol}&sortBy=priceAsc` +
-          '&disablePendingTransactions=false&showAll=true&rbfPreventionListingOnly=false';
+          '&disablePendingTransactions=true&showAll=true&rbfPreventionListingOnly=false';
         const { data } = await axios.get(url);
         return data?.tokens || [];
       })(),
