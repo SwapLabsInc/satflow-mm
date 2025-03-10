@@ -8,7 +8,7 @@ const { deriveWalletDetails } = require('./services/wallet-utils');
 const { getSatflowChallenge, verifySatflowChallenge, signChallenge } = require('./services/bip322');
 const { OrdinalsCollectionManager } = require('./services/protocols/ordinals/collection-manager');
 const { RunesCollectionManager } = require('./services/protocols/runes/collection-manager');
-const { validateBaseEnvironment, validateWalletEnvironment } = require('./services/core/environment');
+const { validateBaseEnvironment, validateWalletEnvironment, checkBelowFloorListings } = require('./services/core/environment');
 
 async function mainLoop() {
   try {
@@ -107,6 +107,9 @@ async function init() {
   try {
     // Validate base environment first
     validateBaseEnvironment();
+    
+    // Check for below-floor listings and ask for confirmation if needed
+    await checkBelowFloorListings();
     
     // Get password if needed (only once at startup)
     const password = await getWalletPassword();

@@ -1,5 +1,8 @@
 const { decrypt } = require('./encryption');
 
+// Global flag to track if below-floor confirmation has been given
+let belowFloorConfirmationGiven = false;
+
 // Helper function to parse and validate bid ladder configuration
 function parseBidLadder(ladderString) {
   if (!ladderString) return null;
@@ -60,6 +63,79 @@ function validateWalletEnvironment(password) {
   }
 }
 
+// Function to check for collections with LIST_ABOVE_PERCENT below 1.0
+// and ask for confirmation if needed
+async function checkBelowFloorListings() {
+  // If confirmation has already been given, skip
+  if (belowFloorConfirmationGiven) {
+    return;
+  }
+
+  // Get all collections and separate them by type
+  const collections = process.env.COLLECTIONS.split(',').map(c => c.trim()).filter(c => c.length > 0);
+  const ordinalCollections = collections.filter(c => !c.toLowerCase().startsWith('rune:'));
+  const runeCollections = collections
+    .filter(c => c.toLowerCase().startsWith('rune:'))
+    .map(c => c.substring(5).toUpperCase()); // Remove 'rune:' prefix
+
+  // Track collections with LIST_ABOVE_PERCENT below 1.0
+  const belowFloorCollections = [];
+
+  // Check ordinal collections
+  ordinalCollections.forEach(collection => {
+    const collectionUpper = collection.toUpperCase();
+    const listAboveKey = `${collectionUpper}_LIST_ABOVE_PERCENT`;
+    
+    const listAbovePercent = Number(process.env[listAboveKey]);
+    if (process.env[listAboveKey] && !isNaN(listAbovePercent) && listAbovePercent < 1) {
+      belowFloorCollections.push({
+        collection,
+        key: listAboveKey,
+        value: listAbovePercent
+      });
+    }
+  });
+
+  // Check rune collections
+  runeCollections.forEach(ticker => {
+    const listAboveKey = `${ticker}_LIST_ABOVE_PERCENT`;
+    
+    const listAbovePercent = Number(process.env[listAboveKey]);
+    if (process.env[listAboveKey] && !isNaN(listAbovePercent) && listAbovePercent < 1) {
+      belowFloorCollections.push({
+        collection: `rune:${ticker}`,
+        key: listAboveKey,
+        value: listAbovePercent
+      });
+    }
+  });
+
+  // If any collections have LIST_ABOVE_PERCENT below 1.0, ask for confirmation
+  if (belowFloorCollections.length > 0) {
+    const prompts = require('prompts');
+    
+    console.warn('\n⚠️  WARNING: The following collections are configured to list below floor price:');
+    belowFloorCollections.forEach(item => {
+      console.warn(`  - ${item.collection}: ${(item.value * 100).toFixed(2)}% of floor price (${item.key}=${item.value})`);
+    });
+    
+    const { confirm } = await prompts({
+      type: 'confirm',
+      name: 'confirm',
+      message: 'Do you acknowledge that you are listing below floor prices and wish to continue anyway?',
+      initial: false
+    });
+    
+    if (!confirm) {
+      console.error('Operation cancelled by user');
+      process.exit(1);
+    }
+    
+    console.log('Continuing with below-floor listings as requested...');
+    belowFloorConfirmationGiven = true;
+  }
+}
+
 function validateBaseEnvironment() {
   const baseRequired = [
     'COLLECTIONS',
@@ -94,10 +170,10 @@ function validateBaseEnvironment() {
       process.exit(1);
     }
 
-    // Validate list above percent if present
+    // Check list above percent if present
     const listAbovePercent = Number(process.env[listAboveKey]);
-    if (process.env[listAboveKey] && (isNaN(listAbovePercent) || listAbovePercent < 1)) {
-      console.error(`${listAboveKey} must be a number greater than or equal to 1`);
+    if (process.env[listAboveKey] && isNaN(listAbovePercent)) {
+      console.error(`${listAboveKey} must be a number`);
       process.exit(1);
     }
     
@@ -124,8 +200,8 @@ function validateBaseEnvironment() {
     }
 
     const listAbovePercent = Number(process.env[listAboveKey]);
-    if (process.env[listAboveKey] && (isNaN(listAbovePercent) || listAbovePercent < 1)) {
-      console.error(`${listAboveKey} must be a number greater than or equal to 1`);
+    if (process.env[listAboveKey] && isNaN(listAbovePercent)) {
+      console.error(`${listAboveKey} must be a number`);
       process.exit(1);
     }
     
@@ -157,5 +233,6 @@ function validateBaseEnvironment() {
 module.exports = {
   validateBaseEnvironment,
   validateWalletEnvironment,
-  parseBidLadder
+  parseBidLadder,
+  checkBelowFloorListings
 };
