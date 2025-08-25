@@ -33,7 +33,7 @@ async function listOnSatflow(item, listingPriceSats) {
     }
 
     const intentRes = await axios.post(
-      'https://api.satflow.mcom/v1/intent/sell',
+      'https://api.satflow.com/v1/intent/sell',
       intentSellPayload,
       config
     );
