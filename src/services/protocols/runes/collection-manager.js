@@ -465,7 +465,7 @@ class RunesCollectionManager extends BaseCollectionManager {
     // Cancel bids if needed
     if (existingBids.length > 0 && shouldCancelBids) {
       try {
-        const bidIds = existingBids.map(bid => bid.bid_id);
+        const bidIds = existingBids.map(bid => bid.bid_id?.$oid || bid.bid_id);
         await this.biddingService.cancelBids(bidIds);
         console.log(`Cancelled ${bidIds.length} existing bids`);
         existingBids = []; // Clear existing bids after cancellation
