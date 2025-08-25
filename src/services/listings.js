@@ -4,6 +4,9 @@ const { deriveWalletDetails, deriveSigningKey, DEFAULT_DERIVATION_PATH } = requi
 const { signPSBT, finalizePSBT } = require('./psbt-utils');
 
 async function listOnSatflow(item, listingPriceSats) {
+  let intentSellPayload; // Declare outside try block for debug access
+  let bulkListPayload; // Declare outside try block for debug access
+
   try {
     const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
     const config = {
@@ -13,35 +16,34 @@ async function listOnSatflow(item, listingPriceSats) {
     };
 
     // Step 1: Get the unsigned PSBT from Satflow
-    const intentSellPayload = {
+    intentSellPayload = {
       price: listingPriceSats,
-      ord_address: walletDetails.address,
-      receive_address: walletDetails.address,
-      tap_key: walletDetails.tapKey
+      sellerOrdAddress: walletDetails.address,
+      sellerReceiveAddress: walletDetails.address,
+      tapInternalKey: walletDetails.tapKey
     };
 
-    // For runes, use inscription_id as runes_output (it's actually the UTXO ID)
-    // For ordinals, use inscription_id and collection_slug as normal
+    // For runes, use inscription_id as runesOutput (it's actually the UTXO ID)
+    // For ordinals, use inscriptionId (collection_slug no longer exists in new API)
     if (item.token.rune_amount) {
-      intentSellPayload.runes_output = item.token.inscription_id;
+      intentSellPayload.runesOutput = item.token.inscription_id;
     } else {
-      intentSellPayload.inscription_id = item.token.inscription_id;
-      intentSellPayload.collection_slug = item.collection.id;
+      intentSellPayload.inscriptionId = item.token.inscription_id;
     }
 
     const intentRes = await axios.post(
-      'https://native.satflow.com/intent/sell',
-      JSON.stringify(intentSellPayload),
+      'https://api.satflow.com/v1/intent/sell',
+      intentSellPayload,
       config
     );
 
-    const unsignedListingPSBTBase64 = intentRes.data.seller.unsignedListingPSBTBase64;
+    const unsignedListingPSBTBase64 = intentRes.data.data.seller.unsignedListingPSBTBase64;
     if (!unsignedListingPSBTBase64) {
       throw new Error('No PSBT found in response');
     }
 
     // Extract secure listing PSBTs
-    const secureListingPSBTs = intentRes.data.seller.secureListingPSBTs || [];
+    const secureListingPSBTs = intentRes.data.data.seller.secureListingPSBTs || [];
 
     // Step 2: Sign PSBTs
     const signingKey = deriveSigningKey(
@@ -64,28 +66,25 @@ async function listOnSatflow(item, listingPriceSats) {
 
     // Step 3: Submit signed PSBTs
     const signedListingPsbtBase64 = psbt.toBase64();
-    const bulkListPayload = {
-      signed_listing_psbt: signedListingPsbtBase64,
-      unsigned_listing_psbt: unsignedListingPSBTBase64,
-      signed_secure_listing_psbts: signedSecureListingPSBTs,
+    bulkListPayload = {
+      signedListingPSBT: signedListingPsbtBase64,
+      unsignedListingPSBT: unsignedListingPSBTBase64,
+      signedSecureListingPSBTs: signedSecureListingPSBTs,
       listings: [{
         price: listingPriceSats,
-        ord_address: walletDetails.address,
-        receive_address: walletDetails.address,
-        tap_key: walletDetails.tapKey,
+        sellerOrdAddress: walletDetails.address,
+        sellerReceiveAddress: walletDetails.address,
+        tapInternalKey: walletDetails.tapKey,
         ...(item.token.rune_amount 
-          ? { runes_output: item.token.inscription_id }
-          : { 
-              inscription_id: item.token.inscription_id,
-              collection_slug: item.collection.id
-            }
+          ? { runesOutput: item.token.inscription_id }
+          : { inscriptionId: item.token.inscription_id }
         )
       }]
     };
 
     const bulkListRes = await axios.post(
-      'https://native.satflow.com/bulkList',
-      JSON.stringify(bulkListPayload),
+      'https://api.satflow.com/v1/list',
+      bulkListPayload,
       config
     );
 
@@ -96,6 +95,22 @@ async function listOnSatflow(item, listingPriceSats) {
     return bulkListRes.data;
   } catch (error) {
     console.error(`Failed to list ${item.token.inscription_id}: ${error.message}`);
+    
+    // Debug logging for 400 and 500 errors
+    if (error.response && (error.response.status === 400 || error.response.status === 500)) {
+      const errorType = error.response.status === 400 ? '400 Bad Request' : '500 Internal Server Error';
+      console.error(`DEBUG - ${errorType} Details:`);
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+      if (intentSellPayload) {
+        console.error('Intent sell payload sent:', JSON.stringify(intentSellPayload, null, 2));
+      }
+      if (bulkListPayload) {
+        console.error('Bulk list payload sent:', JSON.stringify(bulkListPayload, null, 2));
+      }
+      console.error('Request headers:', JSON.stringify(error.config?.headers, null, 2));
+    }
+    
     throw error;
   }
 }

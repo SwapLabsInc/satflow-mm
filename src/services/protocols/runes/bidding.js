@@ -8,10 +8,19 @@ class RunesBiddingService {
       throw new Error('SATFLOW_API_KEY environment variable is required');
     }
     this.signature = null;
+    this.feeRate = 1; // Default fallback fee rate
   }
 
   setSignature(signature) {
     this.signature = signature;
+  }
+
+  setFeeRate(feeRate) {
+    this.feeRate = feeRate;
+  }
+
+  getFeeRate() {
+    return this.feeRate;
   }
 
   async getBiddingWalletAddress() {
@@ -65,18 +74,19 @@ class RunesBiddingService {
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       
       const response = await axios.get(
-        'https://native.satflow.com/walletBids',
+        'https://api.satflow.com/v1/address/bids',
         {
           params: {
             address: walletDetails.address
           },
           headers: {
+            'Accept': 'application/json',
             'x-api-key': process.env.SATFLOW_API_KEY
           }
         }
       );
 
-      return response.data.results || [];
+      return response.data.data?.results || response.data.results || [];
     } catch (error) {
       console.error(`Failed to get existing bids: ${error.message}`);
       throw error;
@@ -160,27 +170,29 @@ class RunesBiddingService {
       const signedBiddingMessage = signChallenge(unsignedMessage, process.env.LOCAL_WALLET_SEED);
       
       const payload = {
-        bid_expiry: bidExpiry,
-        bidder_payment_address: walletDetails.address,
-        bidder_payment_address_pubkey: walletDetails.tapKey,
-        bidder_token_receive_address: walletDetails.address,
-        meta_type: 'runes',
-        collection_slug: fullRuneTicker,
+        bidExpiry: bidExpiry,
+        bidderAddress: walletDetails.address,
+        bidderAddressPublicKey: walletDetails.tapKey,
+        bidderTokenReceiveAddress: walletDetails.address,
+        metaType: 'runes',
+        collectionSlug: fullRuneTicker,
         price: totalBidAmount,
         quantity,
-        signed_bidding_message: signedBiddingMessage,
+        feeRate: this.feeRate,
+        signedBiddingMessage: signedBiddingMessage,
         timestamp: timestamp,
         address: walletDetails.address,
         signature: this.signature
       };
 
       const response = await axios.post(
-        'https://native.satflow.com/bid',
+        'https://api.satflow.com/v1/bid/place',
         payload,
         {
           headers: {
             'x-api-key': process.env.SATFLOW_API_KEY,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
         }
       );

@@ -9,10 +9,15 @@ const { getSatflowChallenge, verifySatflowChallenge, signChallenge } = require('
 const { OrdinalsCollectionManager } = require('./services/protocols/ordinals/collection-manager');
 const { RunesCollectionManager } = require('./services/protocols/runes/collection-manager');
 const { validateBaseEnvironment, validateWalletEnvironment, checkBelowFloorListings } = require('./services/core/environment');
+const { FeeService } = require('./services/fee-service');
 
 async function mainLoop() {
   try {
     console.log('\n=== Starting New Cycle ===');
+    
+    // Fetch recommended fees once per cycle
+    const feeRate = await FeeService.getFastestFee();
+    console.log(`Using fee rate: ${feeRate} sat/vB`);
     
     // Initialize collection managers for each protocol
     const ordinalsManager = new OrdinalsCollectionManager();
@@ -33,9 +38,11 @@ async function mainLoop() {
         throw new Error('Local signature verification failed');
       }
 
-      // Store signature in bidding services for this cycle
+      // Store signature and fee rate in bidding services for this cycle
       ordinalsManager.biddingService.setSignature(signature);
       runesManager.biddingService.setSignature(signature);
+      ordinalsManager.biddingService.setFeeRate(feeRate);
+      runesManager.biddingService.setFeeRate(feeRate);
 
       // Get bidding wallet info (can use either service since they share the same wallet)
       biddingAddress = await runesManager.biddingService.getBiddingWalletAddress();
