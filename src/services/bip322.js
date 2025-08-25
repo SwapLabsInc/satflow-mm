@@ -9,18 +9,20 @@ const ECPair = ECPairFactory(ecc);
 async function getSatflowChallenge(address) {
   try {
     const response = await axios.get(
-      'https://native.satflow.com/satflow/getChallenge',
+      'https://api.satflow.com/v1/challenge',
       {
         params: {
           address
         },
         headers: {
+          'Accept': 'application/json',
           'x-api-key': process.env.SATFLOW_API_KEY
         }
       }
     );
 
-    return response.data.challenge;
+    // Handle new nested API response structure
+    return response.data.data?.challenge || response.data.challenge;
   } catch (error) {
     console.error(`Failed to get Satflow challenge: ${error.message}`);
     if (error.response) {

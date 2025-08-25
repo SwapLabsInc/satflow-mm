@@ -19,7 +19,7 @@ class RunesBiddingService {
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       
       const response = await axios.get(
-        'https://native.satflow.com/biddingWallet/address',
+        'https://api.satflow.com/v1/address/bidding-wallet',
         {
           params: {
             ordinalsAddress: walletDetails.address,
@@ -27,12 +27,13 @@ class RunesBiddingService {
             paymentPubkey: walletDetails.tapKey
           },
           headers: {
+            'Accept': 'application/json',
             'x-api-key': process.env.SATFLOW_API_KEY
           }
         }
       );
 
-      return response.data.multiSig.address;
+      return response.data.data?.multiSig?.address || response.data.multiSig.address;
     } catch (error) {
       console.error(`Failed to get bidding wallet address: ${error.message}`);
       throw error;
