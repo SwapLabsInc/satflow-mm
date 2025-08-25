@@ -10,6 +10,7 @@ const { OrdinalsCollectionManager } = require('./services/protocols/ordinals/col
 const { RunesCollectionManager } = require('./services/protocols/runes/collection-manager');
 const { validateBaseEnvironment, validateWalletEnvironment, checkBelowFloorListings } = require('./services/core/environment');
 const { FeeService } = require('./services/fee-service');
+const { logError } = require('./utils/logger');
 
 async function mainLoop() {
   try {
@@ -49,7 +50,7 @@ async function mainLoop() {
       biddingBalance = await runesManager.biddingService.getBiddingWalletBalance(biddingAddress);
       console.log(`Satflow Bidding wallet balance: ${biddingBalance} sats`);
     } catch (error) {
-      console.error(`Satflow Bidding wallet error: ${error.message}`);
+      logError(`Satflow Bidding wallet error: ${error.message}`);
       return;
     }
     
@@ -79,14 +80,14 @@ async function mainLoop() {
           await ordinalsManager.processCollection(collection, ordinals, biddingAddress, biddingBalance);
         }
       } catch (error) {
-        console.error(`Error processing ${collection}:`, error.message);
+        logError(`Error processing ${collection}:`, error.message);
         // Continue with next collection
       }
     }
 
     console.log(`\n=== Cycle Complete (Next run in ${process.env.LOOP_SECONDS}s) ===\n`);
   } catch (error) {
-    console.error('Main loop error:', error.message);
+    logError('Main loop error:', error.message);
   }
 }
 
@@ -101,7 +102,7 @@ async function getWalletPassword() {
     });
 
     if (!password) {
-      console.error('Password is required to decrypt the wallet seed');
+      logError('Password is required to decrypt the wallet seed');
       process.exit(1);
     }
     return password;
@@ -131,7 +132,7 @@ async function init() {
     // Run immediately on startup
     mainLoop();
   } catch (error) {
-    console.error('Initialization error:', error.message);
+    logError('Initialization error:', error.message);
     process.exit(1);
   }
 }

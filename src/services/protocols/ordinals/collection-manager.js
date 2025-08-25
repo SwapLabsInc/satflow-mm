@@ -3,6 +3,7 @@ const { OrdinalsBiddingService } = require('./bidding');
 const { fetchMarketPrice, calculateAveragePrice } = require('./market');
 const { listOnSatflow } = require('../../listings');
 const { parseBidLadder } = require('../../core/environment');
+const { logError } = require('../../../utils/logger');
 
 class OrdinalsCollectionManager extends BaseCollectionManager {
   constructor() {
@@ -18,7 +19,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
-      console.error('Missing required Ordinals environment variables:', missing.join(', '));
+      logError('Missing required Ordinals environment variables:', missing.join(', '));
       process.exit(1);
     }
   }
@@ -46,7 +47,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         console.log('\nNo existing bids for this collection');
       }
     } catch (error) {
-      console.error(`Failed to fetch existing bids: ${error.message}`);
+      logError(`Failed to fetch existing bids: ${error.message}`);
     }
 
     // Fetch market data and calculate prices
@@ -293,7 +294,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         console.log(`Cancelled ${bidIds.length} existing bids`);
         existingBids = []; // Clear existing bids after cancellation
       } catch (error) {
-        console.error('Failed to cancel bids:', error.message);
+        logError('Failed to cancel bids:', error.message);
       }
     }
 
@@ -323,7 +324,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           }
         }
       } catch (error) {
-        console.error('Failed to create bid:', error.message);
+        logError('Failed to create bid:', error.message);
       }
     }
 
@@ -369,7 +370,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           console.log(`✓ Listed ${inscriptionId} at ${finalListingPrice} sats`);
         }
       } catch (error) {
-        console.error(`✗ Failed ${item.token.inscription_id}: ${error.message}`);
+        logError(`✗ Failed ${item.token.inscription_id}: ${error.message}`);
       }
     }
   }

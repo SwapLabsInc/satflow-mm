@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
 
 async function fetchSatflowListings(collectionId) {
@@ -13,20 +14,20 @@ async function fetchSatflowListings(collectionId) {
 
     return data.data?.listings || [];
   } catch (error) {
-    console.error(`❌ Satflow API Error for collection '${collectionId}':`);
-    console.error(`   📍 URL: ${url}`);
-    console.error(`   📊 Status: ${error.response?.status || 'No status'}`);
-    console.error(`   📄 Response Data:`, JSON.stringify(error.response?.data, null, 2));
-    console.error(`   🔑 API Key Present: ${process.env.SATFLOW_API_KEY ? 'Yes' : 'No'}`);
-    console.error(`   🔑 Request Headers:`, JSON.stringify(error.config?.headers, null, 2));
-    console.error(`   💬 Full Error Message: ${error.message}`);
+    logError(`❌ Satflow API Error for collection '${collectionId}':`);
+    logError(`   📍 URL: ${url}`);
+    logError(`   📊 Status: ${error.response?.status || 'No status'}`);
+    logError(`   📄 Response Data:`, JSON.stringify(error.response?.data, null, 2));
+    logError(`   🔑 API Key Present: ${process.env.SATFLOW_API_KEY ? 'Yes' : 'No'}`);
+    logError(`   🔑 Request Headers:`, JSON.stringify(error.config?.headers, null, 2));
+    logError(`   💬 Full Error Message: ${error.message}`);
     
     // Additional context for debugging
     if (error.response?.status === 404) {
-      console.error(`   ❓ 404 Troubleshooting:`);
-      console.error(`      • Check if collection_id '${collectionId}' exists in Satflow`);
-      console.error(`      • Verify endpoint URL is correct`);
-      console.error(`      • Confirm API version (v1) is supported`);
+      logError(`   ❓ 404 Troubleshooting:`);
+      logError(`      • Check if collection_id '${collectionId}' exists in Satflow`);
+      logError(`      • Verify endpoint URL is correct`);
+      logError(`      • Confirm API version (v1) is supported`);
     }
     
     return [];
@@ -119,7 +120,7 @@ async function fetchMarketPrice(collectionSymbol) {
 
     return allListings;
   } catch (error) {
-    console.error(`Market price fetch failed: ${error.message}`);
+    logError(`Market price fetch failed: ${error.message}`);
     return [];
   }
 }

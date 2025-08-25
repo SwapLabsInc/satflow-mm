@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { logError } = require('../../../utils/logger');
 
 /**
  * Fetches valid sell orders for a rune from Magic Eden
@@ -28,7 +29,7 @@ async function fetchRuneOrders(runeTicker) {
       }
     });
   } catch (error) {
-    console.error(`Rune market price fetch failed: ${error.message}`);
+    logError(`Rune market price fetch failed: ${error.message}`);
     return [];
   }
 }

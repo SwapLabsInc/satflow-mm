@@ -1,4 +1,5 @@
 const { validateBaseEnvironment } = require('./environment');
+const { logError } = require('../../utils/logger');
 
 class BaseCollectionManager {
   constructor() {
@@ -30,7 +31,7 @@ class BaseCollectionManager {
   getConfiguredCollections() {
     const collections = process.env.COLLECTIONS;
     if (!collections) {
-      console.error('COLLECTIONS environment variable is not set');
+      logError('COLLECTIONS environment variable is not set');
       process.exit(1);
     }
     

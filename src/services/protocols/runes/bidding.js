@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { deriveWalletDetails } = require('../../wallet-utils');
 const { signChallenge } = require('../../bip322');
+const { logError } = require('../../../utils/logger');
 
 class RunesBiddingService {
   constructor() {
@@ -44,7 +45,7 @@ class RunesBiddingService {
 
       return response.data.data?.multiSig?.address || response.data.multiSig.address;
     } catch (error) {
-      console.error(`Failed to get bidding wallet address: ${error.message}`);
+      logError(`Failed to get bidding wallet address: ${error.message}`);
       throw error;
     }
   }
@@ -64,7 +65,7 @@ class RunesBiddingService {
 
       return totalBalance;
     } catch (error) {
-      console.error(`Failed to get bidding wallet balance: ${error.message}`);
+      logError(`Failed to get bidding wallet balance: ${error.message}`);
       throw error;
     }
   }
@@ -88,7 +89,7 @@ class RunesBiddingService {
 
       return response.data.data?.results || response.data.results || [];
     } catch (error) {
-      console.error(`Failed to get existing bids: ${error.message}`);
+      logError(`Failed to get existing bids: ${error.message}`);
       throw error;
     }
   }
@@ -125,10 +126,10 @@ class RunesBiddingService {
       console.log('Successfully cancelled bids');
       return response.data;
     } catch (error) {
-      console.error(`Failed to cancel bid: ${error.message}`);
+      logError(`Failed to cancel bid: ${error.message}`);
       if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+        logError('Response data:', error.response.data);
+        logError('Response status:', error.response.status);
       }
       throw error;
     }
@@ -202,10 +203,10 @@ class RunesBiddingService {
       console.log(`Successfully created bid for ${fullRuneTicker} at ${totalBidAmount.toLocaleString()} sats for ${quantity.toLocaleString()} tokens`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to create bid: ${error.message}`);
+      logError(`Failed to create bid: ${error.message}`);
       if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+        logError('Response data:', error.response.data);
+        logError('Response status:', error.response.status);
       }
       throw error;
     }

@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { deriveWalletDetails } = require('./wallet-utils');
+const { logError } = require('../utils/logger');
 
 /**
  * Fetches ordinal inscriptions from the wallet
@@ -17,7 +18,7 @@ async function fetchOrdinalContents(walletDetails) {
 
     const { data } = response;
     if (!data || !data.results || !data.results.items) {
-      console.error('Invalid ordinals response');
+      logError('Invalid ordinals response');
       return [];
     }
 
@@ -43,7 +44,7 @@ async function fetchOrdinalContents(walletDetails) {
 
     return data.results.items;
   } catch (error) {
-    console.error(`Ordinals fetch failed: ${error.message}`);
+    logError(`Ordinals fetch failed: ${error.message}`);
     return [];
   }
 }
@@ -64,7 +65,7 @@ async function fetchRuneContents(walletDetails) {
 
     const { data } = response;
     if (!data || !data.results || !data.results.items) {
-      console.error('Invalid runes response');
+      logError('Invalid runes response');
       return [];
     }
 
@@ -91,7 +92,7 @@ async function fetchRuneContents(walletDetails) {
 
     return data.results.items;
   } catch (error) {
-    console.error(`Runes fetch failed: ${error.message}`);
+    logError(`Runes fetch failed: ${error.message}`);
     return [];
   }
 }
@@ -115,7 +116,7 @@ async function fetchWalletContents() {
       runes
     };
   } catch (error) {
-    console.error(`Wallet fetch failed: ${error.message}`);
+    logError(`Wallet fetch failed: ${error.message}`);
     return {
       ordinals: [],
       runes: []

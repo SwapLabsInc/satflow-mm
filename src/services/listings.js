@@ -2,6 +2,7 @@ const axios = require('axios');
 const bitcoin = require('bitcoinjs-lib');
 const { deriveWalletDetails, deriveSigningKey, DEFAULT_DERIVATION_PATH } = require('./wallet-utils');
 const { signPSBT, finalizePSBT } = require('./psbt-utils');
+const { logError } = require('../utils/logger');
 
 async function listOnSatflow(item, listingPriceSats) {
   let intentSellPayload; // Declare outside try block for debug access
@@ -32,7 +33,7 @@ async function listOnSatflow(item, listingPriceSats) {
     }
 
     const intentRes = await axios.post(
-      'https://api.satflow.com/v1/intent/sell',
+      'https://api.satflow.mcom/v1/intent/sell',
       intentSellPayload,
       config
     );
@@ -94,21 +95,21 @@ async function listOnSatflow(item, listingPriceSats) {
 
     return bulkListRes.data;
   } catch (error) {
-    console.error(`Failed to list ${item.token.inscription_id}: ${error.message}`);
+    logError(`Failed to list ${item.token.inscription_id}: ${error.message}`);
     
     // Debug logging for 400 and 500 errors
     if (error.response && (error.response.status === 400 || error.response.status === 500)) {
       const errorType = error.response.status === 400 ? '400 Bad Request' : '500 Internal Server Error';
-      console.error(`DEBUG - ${errorType} Details:`);
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+      logError(`DEBUG - ${errorType} Details:`);
+      logError('Response status:', error.response.status);
+      logError('Response data:', JSON.stringify(error.response.data, null, 2));
       if (intentSellPayload) {
-        console.error('Intent sell payload sent:', JSON.stringify(intentSellPayload, null, 2));
+        logError('Intent sell payload sent:', JSON.stringify(intentSellPayload, null, 2));
       }
       if (bulkListPayload) {
-        console.error('Bulk list payload sent:', JSON.stringify(bulkListPayload, null, 2));
+        logError('Bulk list payload sent:', JSON.stringify(bulkListPayload, null, 2));
       }
-      console.error('Request headers:', JSON.stringify(error.config?.headers, null, 2));
+      logError('Request headers:', JSON.stringify(error.config?.headers, null, 2));
     }
     
     throw error;
