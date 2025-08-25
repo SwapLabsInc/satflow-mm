@@ -104,13 +104,15 @@ class OrdinalsBiddingService {
       }
 
       const payload = {
-        address: walletDetails.address,
+        makerAddress: walletDetails.address,
+        orderType: 'bid',
         signature: this.signature,
-        bidIds
+        _ids: bidIds,
+        multiple: bidIds.length > 1
       };
       
       const response = await axios.post(
-        'https://native.satflow.com/cancel',
+        'https://api.satflow.com/v1/cancel',
         payload,
         {
           headers: {
