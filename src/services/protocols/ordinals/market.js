@@ -2,17 +2,33 @@ const axios = require('axios');
 const { deriveWalletDetails } = require('../../wallet-utils');
 
 async function fetchSatflowListings(collectionId) {
+  const url = `https://api.satflow.com/v1/activity/listings?collectionSlug=${collectionId}&sortDirection=asc&active=true`;
   try {
-    const url = `https://native.satflow.com/listings?collection_id=${collectionId}&sortBy=price&sortDirection=asc`;
     const { data } = await axios.get(url, {
       headers: {
+        'Accept': 'application/json',
         'x-api-key': process.env.SATFLOW_API_KEY
       }
     });
 
-    return data?.listings || [];
+    return data.data?.listings || [];
   } catch (error) {
-    console.error(`Satflow listings fetch failed: ${error.message}`);
+    console.error(`❌ Satflow API Error for collection '${collectionId}':`);
+    console.error(`   📍 URL: ${url}`);
+    console.error(`   📊 Status: ${error.response?.status || 'No status'}`);
+    console.error(`   📄 Response Data:`, JSON.stringify(error.response?.data, null, 2));
+    console.error(`   🔑 API Key Present: ${process.env.SATFLOW_API_KEY ? 'Yes' : 'No'}`);
+    console.error(`   🔑 Request Headers:`, JSON.stringify(error.config?.headers, null, 2));
+    console.error(`   💬 Full Error Message: ${error.message}`);
+    
+    // Additional context for debugging
+    if (error.response?.status === 404) {
+      console.error(`   ❓ 404 Troubleshooting:`);
+      console.error(`      • Check if collection_id '${collectionId}' exists in Satflow`);
+      console.error(`      • Verify endpoint URL is correct`);
+      console.error(`      • Confirm API version (v1) is supported`);
+    }
+    
     return [];
   }
 }
@@ -50,13 +66,27 @@ async function fetchMarketPrice(collectionSymbol) {
       }));
 
     const satflowListings = satflowData
-      .filter(item => !ignoredAddresses.has(item.seller))
+      .filter(item => item.ask && !ignoredAddresses.has(item.ask.sellerOrdAddress))
       .map(item => ({
         source: 'satflow',
-        inscriptionId: item.inscriptionId,
-        price: item.price,
-        seller: item.seller
+        inscriptionId: item.ask.inscriptionId,
+        price: item.ask.price,
+        seller: item.ask.sellerOrdAddress
       }));
+
+    // Debug: Show market data from each source
+    console.log(`\n📊 Market Analysis for ${collectionSymbol}:`);
+    console.log(`🔮 Magic Eden: ${meListings.length} listings`);
+    if (meListings.length > 0) {
+      const mePrices = meListings.map(l => l.price).sort((a, b) => a - b);
+      console.log(`   └─ Price range: ${mePrices[0].toLocaleString()} - ${mePrices[mePrices.length - 1].toLocaleString()} sats`);
+    }
+    
+    console.log(`⚡ Satflow: ${satflowListings.length} listings`);
+    if (satflowListings.length > 0) {
+      const satflowPrices = satflowListings.map(l => l.price).sort((a, b) => a - b);
+      console.log(`   └─ Price range: ${satflowPrices[0].toLocaleString()} - ${satflowPrices[satflowPrices.length - 1].toLocaleString()} sats`);
+    }
 
     // Deduplicate listings by inscription ID, keeping the lower price
     const listingsByInscription = new Map();
@@ -72,8 +102,19 @@ async function fetchMarketPrice(collectionSymbol) {
     const allListings = Array.from(listingsByInscription.values())
       .sort((a, b) => a.price - b.price);
 
-    if (allListings.length === 0) {
-      console.log('No listings found');
+    console.log(`🔄 After deduplication: ${allListings.length} unique listings`);
+    if (allListings.length > 0) {
+      const finalPrices = allListings.map(l => l.price);
+      console.log(`   └─ Final price range: ${finalPrices[0].toLocaleString()} - ${finalPrices[finalPrices.length - 1].toLocaleString()} sats`);
+      
+      // Show source breakdown in final listings
+      const sourceBreakdown = allListings.reduce((acc, listing) => {
+        acc[listing.source] = (acc[listing.source] || 0) + 1;
+        return acc;
+      }, {});
+      console.log(`   └─ Source breakdown:`, sourceBreakdown);
+    } else {
+      console.log('❌ No listings found after filtering');
     }
 
     return allListings;
