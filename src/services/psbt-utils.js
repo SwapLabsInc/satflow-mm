@@ -1,6 +1,7 @@
 const bitcoin = require('bitcoinjs-lib');
 const { ECPairFactory } = require('ecpair');
 const tinysecp = require('tiny-secp256k1');
+const { logError } = require('../utils/logger');
 
 const ECPair = ECPairFactory(tinysecp);
 
@@ -28,7 +29,7 @@ function signPSBT(psbt, signingKey, isSecure, indicesToSign, tapKey) {
   // Sign specified inputs
   for (const index of inputsToSign) {
     if (index >= psbt.data.inputs.length) {
-      console.error(`Invalid input index ${index}, PSBT only has ${psbt.data.inputs.length} inputs`);
+      logError(`Invalid input index ${index}, PSBT only has ${psbt.data.inputs.length} inputs`);
       continue;
     }
     psbt.signInput(index, signer, [sighashType]);
@@ -42,7 +43,7 @@ function finalizePSBT(psbt) {
     // We don't need to finalize PSBTs since Satflow will do that
     return psbt;
   } catch (error) {
-    console.error('Error finalizing PSBT:', error.message);
+    logError('Error finalizing PSBT:', error.message);
     throw error;
   }
 }

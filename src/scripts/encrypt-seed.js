@@ -4,6 +4,7 @@ const prompts = require('prompts');
 const bip39 = require('bip39');
 
 const { encrypt, decrypt } = require('../services/core/encryption');
+const { logError } = require('../utils/logger');
 
 async function run() {
     const { seed_input } = await prompts({
@@ -19,7 +20,7 @@ async function run() {
     let seed_phrase;
     if (seed_input === 'LOCAL') {
         if (!process.env.LOCAL_WALLET_SEED) {
-            console.error('No LOCAL_WALLET_SEED found - make sure you have it set in your .env file');
+            logError('No LOCAL_WALLET_SEED found - make sure you have it set in your .env file');
             return;
         }
         seed_phrase = process.env.LOCAL_WALLET_SEED;
@@ -34,7 +35,7 @@ async function run() {
 
     const is_valid = bip39.validateMnemonic(seed_phrase);
     if (!is_valid) {
-        console.error('Invalid seed phrase');
+        logError('Invalid seed phrase');
         return;
     }
 
@@ -51,14 +52,14 @@ async function run() {
     });
 
     if (password !== password_confirm) {
-        console.error('Passwords do not match');
+        logError('Passwords do not match');
         return;
     }
 
     const encrypted = encrypt(seed_phrase, password);
     const decrypted = decrypt(encrypted, password);
     if (decrypted !== seed_phrase) {
-        console.error('Decrypted seed phrase does not match original');
+        logError('Decrypted seed phrase does not match original');
         return;
     }
 
@@ -68,4 +69,4 @@ async function run() {
     console.log(`LOCAL_WALLET_SEED_ENCRYPTED=${encrypted}\n`);
 }
 
-run().catch(console.error);
+run().catch(logError);

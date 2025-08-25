@@ -1,4 +1,5 @@
 const { decrypt } = require('./encryption');
+const { logError } = require('../../utils/logger');
 
 // Global flag to track if below-floor confirmation has been given
 let belowFloorConfirmationGiven = false;
@@ -37,7 +38,7 @@ function parseBidLadder(ladderString) {
 function validateWalletEnvironment(password) {
   // Check for either encrypted or plaintext seed
   if (!process.env.LOCAL_WALLET_SEED && !process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
-    console.error('Either LOCAL_WALLET_SEED or LOCAL_WALLET_SEED_ENCRYPTED must be set');
+    logError('Either LOCAL_WALLET_SEED or LOCAL_WALLET_SEED_ENCRYPTED must be set');
     process.exit(1);
   }
 
@@ -49,7 +50,7 @@ function validateWalletEnvironment(password) {
   // If using encrypted seed, decrypt with provided password
   if (process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
     if (!password) {
-      console.error('Password is required to decrypt the wallet seed');
+      logError('Password is required to decrypt the wallet seed');
       process.exit(1);
     }
 
@@ -57,7 +58,7 @@ function validateWalletEnvironment(password) {
       const decrypted = decrypt(process.env.LOCAL_WALLET_SEED_ENCRYPTED, password);
       process.env.LOCAL_WALLET_SEED = decrypted;
     } catch (error) {
-      console.error('Failed to decrypt seed phrase. Invalid password.');
+      logError('Failed to decrypt seed phrase. Invalid password.');
       process.exit(1);
     }
   }
@@ -127,7 +128,7 @@ async function checkBelowFloorListings() {
     });
     
     if (!confirm) {
-      console.error('Operation cancelled by user');
+      logError('Operation cancelled by user');
       process.exit(1);
     }
     
@@ -145,7 +146,7 @@ function validateBaseEnvironment() {
   
   const missing = baseRequired.filter(key => !process.env[key]);
   if (missing.length > 0) {
-    console.error('Missing required environment variables:', missing.join(', '));
+    logError('Missing required environment variables:', missing.join(', '));
     process.exit(1);
   }
 
@@ -166,14 +167,14 @@ function validateBaseEnvironment() {
     // Validate bid below percent if present
     const bidBelowPercent = Number(process.env[bidBelowKey]);
     if (process.env[bidBelowKey] && (isNaN(bidBelowPercent) || bidBelowPercent >= 1)) {
-      console.error(`${bidBelowKey} must be a number less than 1`);
+      logError(`${bidBelowKey} must be a number less than 1`);
       process.exit(1);
     }
 
     // Check list above percent if present
     const listAbovePercent = Number(process.env[listAboveKey]);
     if (process.env[listAboveKey] && isNaN(listAbovePercent)) {
-      console.error(`${listAboveKey} must be a number`);
+      logError(`${listAboveKey} must be a number`);
       process.exit(1);
     }
     
@@ -181,7 +182,7 @@ function validateBaseEnvironment() {
     if (process.env[bidLadderKey]) {
       const ladderResult = parseBidLadder(process.env[bidLadderKey]);
       if (ladderResult && ladderResult.error) {
-        console.error(`${bidLadderKey}: ${ladderResult.error}`);
+        logError(`${bidLadderKey}: ${ladderResult.error}`);
         process.exit(1);
       }
     }
@@ -195,13 +196,13 @@ function validateBaseEnvironment() {
     
     const bidBelowPercent = Number(process.env[bidBelowKey]);
     if (process.env[bidBelowKey] && (isNaN(bidBelowPercent) || bidBelowPercent >= 1)) {
-      console.error(`${bidBelowKey} must be a number less than 1`);
+      logError(`${bidBelowKey} must be a number less than 1`);
       process.exit(1);
     }
 
     const listAbovePercent = Number(process.env[listAboveKey]);
     if (process.env[listAboveKey] && isNaN(listAbovePercent)) {
-      console.error(`${listAboveKey} must be a number`);
+      logError(`${listAboveKey} must be a number`);
       process.exit(1);
     }
     
@@ -209,7 +210,7 @@ function validateBaseEnvironment() {
     if (process.env[bidLadderKey]) {
       const ladderResult = parseBidLadder(process.env[bidLadderKey]);
       if (ladderResult && ladderResult.error) {
-        console.error(`${bidLadderKey}: ${ladderResult.error}`);
+        logError(`${bidLadderKey}: ${ladderResult.error}`);
         process.exit(1);
       }
     }
@@ -218,14 +219,14 @@ function validateBaseEnvironment() {
   // Validate UPDATE_THRESHOLD is a valid number between 0 and 1
   const updateThreshold = Number(process.env.UPDATE_THRESHOLD);
   if (isNaN(updateThreshold) || updateThreshold < 0 || updateThreshold > 1) {
-    console.error('UPDATE_THRESHOLD must be a number between 0 and 1');
+    logError('UPDATE_THRESHOLD must be a number between 0 and 1');
     process.exit(1);
   }
 
   // Validate MAX_BID_TO_LIST_RATIO is a valid number between 0 and 1
   const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
   if (isNaN(maxBidToListRatio) || maxBidToListRatio <= 0 || maxBidToListRatio >= 1) {
-    console.error('MAX_BID_TO_LIST_RATIO must be a number between 0 and 1');
+    logError('MAX_BID_TO_LIST_RATIO must be a number between 0 and 1');
     process.exit(1);
   }
 }

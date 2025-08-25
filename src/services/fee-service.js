@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { logError } = require('../utils/logger');
 
 class FeeService {
   static async getRecommendedFees() {
@@ -27,7 +28,7 @@ class FeeService {
         minimumFee: minimumFee || 1
       };
     } catch (error) {
-      console.error(`Failed to fetch recommended fees: ${error.message}`);
+      logError(`Failed to fetch recommended fees: ${error.message}`);
       console.log('Using fallback fee rate of 1');
       
       // Return fallback fee rates

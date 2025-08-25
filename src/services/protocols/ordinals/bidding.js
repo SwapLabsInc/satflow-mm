@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { deriveWalletDetails } = require('../../wallet-utils');
 const { signChallenge } = require('../../bip322');
+const { logError } = require('../../../utils/logger');
 
 class OrdinalsBiddingService {
   constructor() {
@@ -44,7 +45,7 @@ class OrdinalsBiddingService {
 
       return response.data.data?.multiSig?.address || response.data.multiSig.address;
     } catch (error) {
-      console.error(`Failed to get bidding wallet address: ${error.message}`);
+      logError(`Failed to get bidding wallet address: ${error.message}`);
       throw error;
     }
   }
@@ -64,7 +65,7 @@ class OrdinalsBiddingService {
 
       return totalBalance;
     } catch (error) {
-      console.error(`Failed to get bidding wallet balance: ${error.message}`);
+      logError(`Failed to get bidding wallet balance: ${error.message}`);
       throw error;
     }
   }
@@ -88,7 +89,7 @@ class OrdinalsBiddingService {
 
       return response.data.data?.results || response.data.results || [];
     } catch (error) {
-      console.error(`Failed to get existing bids: ${error.message}`);
+      logError(`Failed to get existing bids: ${error.message}`);
       throw error;
     }
   }
@@ -125,10 +126,10 @@ class OrdinalsBiddingService {
       console.log('Successfully cancelled bids');
       return response.data;
     } catch (error) {
-      console.error(`Failed to cancel bid: ${error.message}`);
+      logError(`Failed to cancel bid: ${error.message}`);
       if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+        logError('Response data:', error.response.data);
+        logError('Response status:', error.response.status);
       }
       throw error;
     }
@@ -192,14 +193,14 @@ class OrdinalsBiddingService {
       console.log(`Successfully created bid for ${collectionSlug}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to create bid: ${error.message}`);
+      logError(`Failed to create bid: ${error.message}`);
       if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+        logError('Response data:', error.response.data);
+        logError('Response status:', error.response.status);
         
         // Debug: dump entire payload on 400 errors
         if (error.response.status === 400 && payload) {
-          console.error('DEBUG - Full payload sent to Satflow:', JSON.stringify(payload, null, 2));
+          logError('DEBUG - Full payload sent to Satflow:', JSON.stringify(payload, null, 2));
         }
       }
       throw error;

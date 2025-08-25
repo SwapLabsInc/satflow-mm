@@ -3,6 +3,7 @@ const { fetchRuneOrders, calculateAveragePriceByDepth } = require('./market');
 const { listOnSatflow } = require('../../listings');
 const { RunesBiddingService } = require('./bidding');
 const { parseBidLadder } = require('../../core/environment');
+const { logError } = require('../../../utils/logger');
 
 class RunesCollectionManager extends BaseCollectionManager {
   constructor() {
@@ -18,7 +19,7 @@ class RunesCollectionManager extends BaseCollectionManager {
     
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
-      console.error('Missing required Runes environment variables:', missing.join(', '));
+      logError('Missing required Runes environment variables:', missing.join(', '));
       process.exit(1);
     }
   }
@@ -35,12 +36,12 @@ class RunesCollectionManager extends BaseCollectionManager {
     const depthSats = Number(process.env[depthKey]);
     
     if (!process.env[depthKey]) {
-      console.error(`Missing required environment variable: ${depthKey}`);
+      logError(`Missing required environment variable: ${depthKey}`);
       process.exit(1);
     }
 
     if (isNaN(depthSats) || depthSats <= 0) {
-      console.error(`${depthKey} must be a positive number`);
+      logError(`${depthKey} must be a positive number`);
       process.exit(1);
     }
 
@@ -280,7 +281,7 @@ class RunesCollectionManager extends BaseCollectionManager {
           console.log(`✓ Listed ${inscriptionId} (${runeAmount.toLocaleString()} tokens) at ${totalListingPrice.toLocaleString()} sats`);
         }
         } catch (error) {
-          console.error(`✗ Failed ${item.token.runes_output}: ${error.message}`);
+          logError(`✗ Failed ${item.token.runes_output}: ${error.message}`);
         }
       }
     }
@@ -307,7 +308,7 @@ class RunesCollectionManager extends BaseCollectionManager {
         console.log('\nNo existing bids for this rune');
       }
     } catch (error) {
-      console.error(`Failed to fetch existing bids: ${error.message}`);
+      logError(`Failed to fetch existing bids: ${error.message}`);
     }
 
     // Get update threshold from environment
@@ -470,7 +471,7 @@ class RunesCollectionManager extends BaseCollectionManager {
         console.log(`Cancelled ${bidIds.length} existing bids`);
         existingBids = []; // Clear existing bids after cancellation
       } catch (error) {
-        console.error('Failed to cancel bids:', error.message);
+        logError('Failed to cancel bids:', error.message);
       }
     }
 
@@ -497,7 +498,7 @@ class RunesCollectionManager extends BaseCollectionManager {
           }
         }
       } catch (error) {
-        console.error('Failed to create bid:', error.message);
+        logError('Failed to create bid:', error.message);
       }
     }
   }

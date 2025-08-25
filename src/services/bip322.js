@@ -5,6 +5,7 @@ const bitcoin = require('bitcoinjs-lib');
 const ecc = require('tiny-secp256k1');
 const { ECPairFactory } = require('ecpair');
 const ECPair = ECPairFactory(ecc);
+const { logError } = require('../utils/logger');
 
 async function getSatflowChallenge(address) {
   try {
@@ -24,10 +25,10 @@ async function getSatflowChallenge(address) {
     // Handle new nested API response structure
     return response.data.data?.challenge || response.data.challenge;
   } catch (error) {
-    console.error(`Failed to get Satflow challenge: ${error.message}`);
+    logError(`Failed to get Satflow challenge: ${error.message}`);
     if (error.response) {
-      console.error('Response data:', error.response.data);
-      console.error('Response status:', error.response.status);
+      logError('Response data:', error.response.data);
+      logError('Response status:', error.response.status);
     }
     throw error;
   }
@@ -44,7 +45,7 @@ async function verifySatflowChallenge(address, signature, challenge) {
     const isValid = Verifier.verifySignature(address, challenge, signature);
     return { verified: isValid };
   } catch (error) {
-    console.error(`Failed to verify challenge: ${error.message}`);
+    logError(`Failed to verify challenge: ${error.message}`);
     throw error;
   }
 }
@@ -70,7 +71,7 @@ function signChallenge(challenge, seed) {
     
     return signature;
   } catch (error) {
-    console.error(`Failed to sign challenge: ${error.message}`);
+    logError(`Failed to sign challenge: ${error.message}`);
     throw error;
   }
 }
