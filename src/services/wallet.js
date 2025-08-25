@@ -3,12 +3,13 @@ const { deriveWalletDetails } = require('./wallet-utils');
 const { logError } = require('../utils/logger');
 
 /**
- * Fetches ordinal inscriptions from the wallet
- * @returns {Promise<Array>} Array of ordinal items
+ * Fetches wallet contents from the new Satflow API v1 endpoint
+ * @param {Object} walletDetails - Wallet details including address
+ * @returns {Promise<Object>} Object containing ordinals and runes data
  */
-async function fetchOrdinalContents(walletDetails) {
+async function fetchWalletContentsFromAPI(walletDetails) {
   try {
-    const walletUrl = `https://native.satflow.com/walletContents?address=${walletDetails.address}&connectedAddress=${walletDetails.address}&page=1&page_size=100&itemType=inscription`;
+    const walletUrl = `https://api.satflow.com/v1/address/wallet-contents?address=${walletDetails.address}`;
     
     const response = await axios.get(walletUrl, {
       headers: {
@@ -17,14 +18,32 @@ async function fetchOrdinalContents(walletDetails) {
     });
 
     const { data } = response;
-    if (!data || !data.results || !data.results.items) {
-      logError('Invalid ordinals response');
-      return [];
+    if (!data || !data.success || !data.data || !data.data.results) {
+      logError('Invalid wallet contents response');
+      return { ordinals: [], runes: [] };
     }
 
-    // Build accurate listing counts from items data
+    return {
+      ordinals: data.data.results.ordinals || [],
+      runes: data.data.results.runes || []
+    };
+  } catch (error) {
+    logError(`Wallet contents fetch failed: ${error.message}`);
+    return { ordinals: [], runes: [] };
+  }
+}
+
+/**
+ * Fetches ordinal inscriptions from the wallet
+ * @returns {Promise<Array>} Array of ordinal items
+ */
+async function fetchOrdinalContents(walletDetails) {
+  try {
+    const { ordinals } = await fetchWalletContentsFromAPI(walletDetails);
+
+    // Build accurate listing counts from ordinals data
     const listingCounts = {};
-    data.results.items.forEach(item => {
+    ordinals.forEach(item => {
       if (item.collection?.id) {
         listingCounts[item.collection.id] = listingCounts[item.collection.id] || { total: 0, listed: 0 };
         listingCounts[item.collection.id].total++;
@@ -35,14 +54,19 @@ async function fetchOrdinalContents(walletDetails) {
     });
 
     // Log ordinals summary
-    (data.results.summary || []).forEach(collection => {
-      if (collection.collection?.id) {
-        const counts = listingCounts[collection.collection.id] || { total: 0, listed: 0 };
-        console.log(`${collection.collection.name}: ${counts.total} items (${counts.listed} listed)`);
+    const collections = {};
+    ordinals.forEach(item => {
+      if (item.collection?.id) {
+        collections[item.collection.id] = item.collection;
       }
     });
 
-    return data.results.items;
+    Object.entries(collections).forEach(([collectionId, collection]) => {
+      const counts = listingCounts[collectionId] || { total: 0, listed: 0 };
+      console.log(`${collection.name}: ${counts.total} items (${counts.listed} listed)`);
+    });
+
+    return ordinals;
   } catch (error) {
     logError(`Ordinals fetch failed: ${error.message}`);
     return [];
@@ -55,23 +79,11 @@ async function fetchOrdinalContents(walletDetails) {
  */
 async function fetchRuneContents(walletDetails) {
   try {
-    const walletUrl = `https://native.satflow.com/walletContents?address=${walletDetails.address}&connectedAddress=${walletDetails.address}&page=1&page_size=100&itemType=rune`;
-    
-    const response = await axios.get(walletUrl, {
-      headers: {
-        'x-api-key': process.env.SATFLOW_API_KEY
-      }
-    });
-
-    const { data } = response;
-    if (!data || !data.results || !data.results.items) {
-      logError('Invalid runes response');
-      return [];
-    }
+    const { runes } = await fetchWalletContentsFromAPI(walletDetails);
 
     // Calculate total balance for each rune
     const runeBalances = {};
-    data.results.items.forEach(item => {
+    runes.forEach(item => {
       if (item.collection?.id && item.token?.rune_amount) {
         const runeId = item.collection.id;
         runeBalances[runeId] = runeBalances[runeId] || {
@@ -90,7 +102,7 @@ async function fetchRuneContents(walletDetails) {
       console.log(`${info.symbol} ${runeId}: ${formattedAmount} tokens`);
     });
 
-    return data.results.items;
+    return runes;
   } catch (error) {
     logError(`Runes fetch failed: ${error.message}`);
     return [];
@@ -106,10 +118,7 @@ async function fetchWalletContents() {
     const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
     console.log(`Fetching wallet contents for ${walletDetails.address}`);
 
-    const [ordinals, runes] = await Promise.all([
-      fetchOrdinalContents(walletDetails),
-      fetchRuneContents(walletDetails)
-    ]);
+    const { ordinals, runes } = await fetchWalletContentsFromAPI(walletDetails);
 
     return {
       ordinals,
