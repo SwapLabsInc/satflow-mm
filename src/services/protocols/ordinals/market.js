@@ -3,7 +3,7 @@ const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
 
 async function fetchSatflowListings(collectionId) {
-  const url = `https://api.satflow.com/v1/activity/listings?collectionSlug=${collectionId}&sortDirection=asc&active=true`;
+  const url = `https://api.satflow.com/v1/activity/listings?collectionSlug=${collectionId}&sortBy=price&sortDirection=asc&active=true`;
   try {
     const { data } = await axios.get(url, {
       headers: {
