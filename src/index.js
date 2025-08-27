@@ -12,6 +12,9 @@ const { validateBaseEnvironment, validateWalletEnvironment, checkBelowFloorListi
 const { FeeService } = require('./services/fee-service');
 const { logError } = require('./utils/logger');
 
+// Prevent overlapping execution of the main loop
+let loopInProgress = false;
+
 async function mainLoop() {
   try {
     console.log('\n=== Starting New Cycle ===');
@@ -127,10 +130,21 @@ async function init() {
     
     // Run the loop on an interval
     const intervalSeconds = Number(process.env.LOOP_SECONDS) || 15;
-    setInterval(() => mainLoop(), intervalSeconds * 1000);
-    
+
+    const runLoop = async () => {
+      if (loopInProgress) return;
+      loopInProgress = true;
+      try {
+        await mainLoop();
+      } finally {
+        loopInProgress = false;
+      }
+    };
+
+    setInterval(runLoop, intervalSeconds * 1000);
+
     // Run immediately on startup
-    mainLoop();
+    runLoop();
   } catch (error) {
     logError('Initialization error:', error.message);
     process.exit(1);
