@@ -21,9 +21,10 @@ function deriveWalletDetails(seed) {
   // Convert mnemonic to seed
   const seedBuffer = bip39.mnemonicToSeedSync(seed);
   
-  // Derive the child key
+  // Derive the child key using custom path if provided, otherwise use default
+  const derivationPath = process.env.CUSTOM_DERIVATION_PATH || DEFAULT_DERIVATION_PATH;
   const root = bip32.fromSeed(seedBuffer);
-  const child = root.derivePath(DEFAULT_DERIVATION_PATH);
+  const child = root.derivePath(derivationPath);
   
   // Convert public key to Buffer
   const pubkeyBuffer = Buffer.from(child.publicKey);

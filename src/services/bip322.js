@@ -52,8 +52,11 @@ async function verifySatflowChallenge(address, signature, challenge) {
 
 function signChallenge(challenge, seed) {
   try {
-    // Get the key pair using existing wallet-utils functionality
-    const keyPair = deriveSigningKey(seed, DEFAULT_DERIVATION_PATH);
+    // Use the same derivation path logic as deriveWalletDetails to ensure consistency
+    const derivationPath = process.env.CUSTOM_DERIVATION_PATH || DEFAULT_DERIVATION_PATH;
+    
+    // Get the key pair using the consistent derivation path
+    const keyPair = deriveSigningKey(seed, derivationPath);
     
     // Get the corresponding address for this key
     const { address } = deriveWalletDetails(seed);

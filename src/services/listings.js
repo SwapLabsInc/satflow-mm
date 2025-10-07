@@ -47,9 +47,11 @@ async function listOnSatflow(item, listingPriceSats) {
     const secureListingPSBTs = intentRes.data.data.seller.secureListingPSBTs || [];
 
     // Step 2: Sign PSBTs
+    // Use the same derivation path logic as deriveWalletDetails to ensure consistency
+    const derivationPath = process.env.CUSTOM_DERIVATION_PATH || DEFAULT_DERIVATION_PATH;
     const signingKey = deriveSigningKey(
       process.env.LOCAL_WALLET_SEED,
-      DEFAULT_DERIVATION_PATH
+      derivationPath
     );
 
     // Sign the listing PSBT (insecure/snipable)

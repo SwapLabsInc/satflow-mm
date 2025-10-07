@@ -1,1 +1,3 @@
 When working on this node application, after making changes, let it run for 15 seconds, then kill
+
+Never read the .env file in the root directory for the project for any reason. If you need to understand the .env behavior, review the code itself to understand or the .env.sample file
