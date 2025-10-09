@@ -163,6 +163,7 @@ function validateBaseEnvironment() {
     const bidBelowKey = `${collectionUpper}_BID_BELOW_PERCENT`;
     const listAboveKey = `${collectionUpper}_LIST_ABOVE_PERCENT`;
     const bidLadderKey = `${collectionUpper}_BID_LADDER`;
+    const priceFloorKey = `${collectionUpper}_PRICE_FLOOR_BTC`;
     
     // Validate bid below percent if present
     const bidBelowPercent = Number(process.env[bidBelowKey]);
@@ -175,6 +176,13 @@ function validateBaseEnvironment() {
     const listAbovePercent = Number(process.env[listAboveKey]);
     if (process.env[listAboveKey] && isNaN(listAbovePercent)) {
       logError(`${listAboveKey} must be a number`);
+      process.exit(1);
+    }
+    
+    // Validate price floor if present
+    const priceFloorBTC = Number(process.env[priceFloorKey]);
+    if (process.env[priceFloorKey] && (isNaN(priceFloorBTC) || priceFloorBTC <= 0)) {
+      logError(`${priceFloorKey} must be a positive number`);
       process.exit(1);
     }
     

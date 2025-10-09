@@ -58,9 +58,21 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
       return;
     }
 
-    // Calculate listing price
+    // Apply price floor to average price if configured
+    let flooredAveragePrice = averagePrice;
+    const priceFloorBTC = Number(process.env[`${collectionId.toUpperCase()}_PRICE_FLOOR_BTC`]);
+    if (priceFloorBTC && !isNaN(priceFloorBTC)) {
+      const priceFloorSats = Math.floor(priceFloorBTC * 100000000);
+      if (averagePrice < priceFloorSats) {
+        console.log(`⚠️ Average price ${averagePrice} sats is below floor ${priceFloorBTC} BTC (${priceFloorSats} sats)`);
+        console.log(`   Using floor price as base for all calculations`);
+        flooredAveragePrice = priceFloorSats;
+      }
+    }
+
+    // Calculate listing price using floored average price
     const listAbovePercent = Number(process.env[`${collectionId.toUpperCase()}_LIST_ABOVE_PERCENT`]) || 1.2;
-    const listingPriceSats = Math.floor(averagePrice * listAbovePercent);
+    const listingPriceSats = Math.floor(flooredAveragePrice * listAbovePercent);
     
     // Get max bid to list ratio
     const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
@@ -344,7 +356,8 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         let finalListingPrice = listingPriceSats;
         
         if (premiumMultiplier) {
-          finalListingPrice = Math.floor(averagePrice * premiumMultiplier);
+          // Use floored average price for premium inscriptions to respect price floor
+          finalListingPrice = Math.floor(flooredAveragePrice * premiumMultiplier);
           console.log(`ℹ Premium price for ${inscriptionId}: ${finalListingPrice} sats (${premiumMultiplier}x average)`);
         }
 
