@@ -6,11 +6,12 @@ const ecc = require('tiny-secp256k1');
 const { ECPairFactory } = require('ecpair');
 const ECPair = ECPairFactory(ecc);
 const { logError } = require('../utils/logger');
+const { SATFLOW_API_BASE_URL } = require('./core/environment');
 
 async function getSatflowChallenge(address) {
   try {
     const response = await axios.get(
-      'https://api.satflow.com/v1/challenge',
+      `${SATFLOW_API_BASE_URL}/challenge`,
       {
         params: {
           address

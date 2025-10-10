@@ -2,6 +2,7 @@ const axios = require('axios');
 const { deriveWalletDetails } = require('../../wallet-utils');
 const { signChallenge } = require('../../bip322');
 const { logError } = require('../../../utils/logger');
+const { SATFLOW_API_BASE_URL } = require('../../core/environment');
 
 class OrdinalsBiddingService {
   constructor() {
@@ -29,7 +30,7 @@ class OrdinalsBiddingService {
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       
       const response = await axios.get(
-        'https://api.satflow.com/v1/address/bidding-wallet',
+        `${SATFLOW_API_BASE_URL}/address/bidding-wallet`,
         {
           params: {
             ordinalsAddress: walletDetails.address,
@@ -75,7 +76,7 @@ class OrdinalsBiddingService {
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       
       const response = await axios.get(
-        'https://api.satflow.com/v1/address/bids',
+        `${SATFLOW_API_BASE_URL}/address/bids`,
         {
           params: {
             address: walletDetails.address
@@ -113,7 +114,7 @@ class OrdinalsBiddingService {
       };
       
       const response = await axios.post(
-        'https://api.satflow.com/v1/cancel',
+        `${SATFLOW_API_BASE_URL}/cancel`,
         payload,
         {
           headers: {
@@ -179,7 +180,7 @@ class OrdinalsBiddingService {
       };
 
       const response = await axios.post(
-        'https://api.satflow.com/v1/bid/place',
+        `${SATFLOW_API_BASE_URL}/bid/place`,
         payload,
         {
           headers: {

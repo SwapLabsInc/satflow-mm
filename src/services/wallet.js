@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { deriveWalletDetails } = require('./wallet-utils');
 const { logError } = require('../utils/logger');
+const { SATFLOW_API_BASE_URL } = require('./core/environment');
 
 /**
  * Fetches wallet contents from the new Satflow API v1 endpoint
@@ -9,7 +10,7 @@ const { logError } = require('../utils/logger');
  */
 async function fetchWalletContentsFromAPI(walletDetails) {
   try {
-    const walletUrl = `https://api.satflow.com/v1/address/wallet-contents?address=${walletDetails.address}`;
+    const walletUrl = `${SATFLOW_API_BASE_URL}/address/wallet-contents?address=${walletDetails.address}`;
     
     const response = await axios.get(walletUrl, {
       headers: {

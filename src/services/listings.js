@@ -3,6 +3,7 @@ const bitcoin = require('bitcoinjs-lib');
 const { deriveWalletDetails, deriveSigningKey, DEFAULT_DERIVATION_PATH } = require('./wallet-utils');
 const { signPSBT, finalizePSBT } = require('./psbt-utils');
 const { logError } = require('../utils/logger');
+const { SATFLOW_API_BASE_URL } = require('./core/environment');
 
 async function listOnSatflow(item, listingPriceSats) {
   let intentSellPayload; // Declare outside try block for debug access
@@ -33,7 +34,7 @@ async function listOnSatflow(item, listingPriceSats) {
     }
 
     const intentRes = await axios.post(
-      'https://api.satflow.com/v1/intent/sell',
+      `${SATFLOW_API_BASE_URL}/intent/sell`,
       intentSellPayload,
       config
     );
@@ -86,7 +87,7 @@ async function listOnSatflow(item, listingPriceSats) {
     };
 
     const bulkListRes = await axios.post(
-      'https://api.satflow.com/v1/list',
+      `${SATFLOW_API_BASE_URL}/list`,
       bulkListPayload,
       config
     );

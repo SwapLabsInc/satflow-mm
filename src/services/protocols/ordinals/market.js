@@ -1,9 +1,10 @@
 const axios = require('axios');
 const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
+const { SATFLOW_API_BASE_URL } = require('../../core/environment');
 
 async function fetchSatflowListings(collectionId) {
-  const url = `https://api.satflow.com/v1/activity/listings?collectionSlug=${collectionId}&sortBy=price&sortDirection=asc&active=true`;
+  const url = `${SATFLOW_API_BASE_URL}/activity/listings?collectionSlug=${collectionId}&sortBy=price&sortDirection=asc&active=true`;
   try {
     const { data } = await axios.get(url, {
       headers: {

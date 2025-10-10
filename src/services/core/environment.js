@@ -1,6 +1,9 @@
 const { decrypt } = require('./encryption');
 const { logError } = require('../../utils/logger');
 
+// API Base URL - change this single line to test against different endpoints
+const SATFLOW_API_BASE_URL = 'https://api.satflow.com/v1';
+
 // Global flag to track if below-floor confirmation has been given
 let belowFloorConfirmationGiven = false;
 
@@ -240,6 +243,7 @@ function validateBaseEnvironment() {
 }
 
 module.exports = {
+  SATFLOW_API_BASE_URL,
   validateBaseEnvironment,
   validateWalletEnvironment,
   parseBidLadder,
