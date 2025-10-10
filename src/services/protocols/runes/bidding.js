@@ -171,7 +171,7 @@ class RunesBiddingService {
       const unsignedMessage = `${walletDetails.address}:${walletDetails.tapKey}:${walletDetails.address}:${totalBidAmount}:${quantity}:${bidExpiry}:${fullRuneTicker}:${timestamp}`;
       
       // Sign the bidding message using BIP322
-      const signedBiddingMessage = signChallenge(unsignedMessage, process.env.LOCAL_WALLET_SEED);
+      const { signature: signedBiddingMessage } = signChallenge(unsignedMessage, process.env.LOCAL_WALLET_SEED);
       
       const payload = {
         bidExpiry: bidExpiry,

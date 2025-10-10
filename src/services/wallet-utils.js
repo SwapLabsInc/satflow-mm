@@ -38,9 +38,13 @@ function deriveWalletDetails(seed) {
   // Get tap key (full public key in hex)
   const tapKey = Buffer.from(child.publicKey).toString('hex');
   
+  // Get public key in hex format (for Magic Eden)
+  const publicKey = Buffer.from(child.publicKey).toString('hex');
+  
   return {
     address: p2wpkh.address,
-    tapKey
+    tapKey,
+    publicKey
   };
 }
 

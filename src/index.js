@@ -34,7 +34,7 @@ async function mainLoop() {
       // Get wallet details and challenge signature
       const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
       const challenge = await getSatflowChallenge(walletDetails.address);
-      const signature = signChallenge(challenge, process.env.LOCAL_WALLET_SEED);
+      const { signature } = signChallenge(challenge, process.env.LOCAL_WALLET_SEED);
       
       // Verify locally with the same challenge
       const verificationResult = await verifySatflowChallenge(walletDetails.address, signature, challenge);

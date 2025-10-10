@@ -73,7 +73,11 @@ function signChallenge(challenge, seed) {
       challenge
     );
     
-    return signature;
+    // Return both signature and original challenge for Magic Eden
+    return {
+      signature,
+      challenge
+    };
   } catch (error) {
     logError(`Failed to sign challenge: ${error.message}`);
     throw error;
