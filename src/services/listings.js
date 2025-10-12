@@ -97,18 +97,6 @@ async function listOnSatflow(item, listingPriceSats) {
       throw new Error(`Unexpected response: ${bulkListRes.status}`);
     }
 
-    // After successful Satflow listing, also list on Magic Eden (for Ordinals only)
-    if (!item.token.rune_amount) {
-      try {
-        // Adjust price higher for Magic Eden to account for maker fee
-        const magicEdenPrice = Math.ceil(listingPriceSats * MAGIC_EDEN_FEE_MULTIPLIER);
-        await listOnMagicEden(item, magicEdenPrice);
-      } catch (magicEdenError) {
-        // Log but don't fail the overall listing if Magic Eden fails
-        logError(`Magic Eden listing failed, but Satflow listing succeeded: ${magicEdenError.message}`);
-      }
-    }
-
     return bulkListRes.data;
   } catch (error) {
     logError(`Failed to list ${item.token.inscription_id}: ${error.message}`);
@@ -204,7 +192,7 @@ async function listOnMagicEden(item, listingPriceSats) {
     listingPsbt = signPSBT(listingPsbt, signingKey, true, [0], walletDetails.tapKey);
     const signedListingPSBT = listingPsbt.toBase64();
 
-    // Sign the transient listing PSBT (secure, typically input 0)
+    // Sign the listing PSBT (secure, typically input 0)
     let listingTransientPsbt = bitcoin.Psbt.fromBase64(unsignedRBFListingTransientPsbtBase64, { network: bitcoin.networks.bitcoin });
     listingTransientPsbt = signPSBT(listingTransientPsbt, signingKey, true, [0], walletDetails.tapKey);
     const signedListingTransientPSBT = listingTransientPsbt.toBase64();
