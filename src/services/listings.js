@@ -205,7 +205,7 @@ async function listOnMagicEden(item, listingPriceSats) {
     // Sign the listing PSBT (secure, typically input 0)
     let listingTransientPsbt = bitcoin.Psbt.fromBase64(unsignedRBFListingTransientPsbtBase64, { network: bitcoin.networks.bitcoin });
     listingTransientPsbt = signPSBT(listingTransientPsbt, signingKey, true, [0], walletDetails.tapKey);
-    const signedListingTransientPSBT = listingTransientPsbt.toBase64()
+    const signedListingTransientPSBT = listingTransientPsbt.toBase64();
 
     // Step 3: Sign BIP322 message
     const { signature: signedMessage, challenge: unsignedMessage } = signChallenge(
@@ -216,6 +216,7 @@ async function listOnMagicEden(item, listingPriceSats) {
     // Step 4: Submit signed listing to Magic Eden
     submitPayload = {
       listings: [{
+        ...result,
         inscriptionId: item.token.inscription_id,
         price: listingPriceSats,
         sellerReceiveAddress: walletDetails.address,
