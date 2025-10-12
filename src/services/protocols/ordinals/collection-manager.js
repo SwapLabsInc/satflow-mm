@@ -378,7 +378,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
         if (existingListing) {
           // Calculate platform-specific target price
-          // Magic Eden listings need to be 0.5% higher to account for maker fee
+          // Magic Eden listings are adjusted higher to account for maker fee
           const targetPrice = existingListing.source === 'magiceden' 
             ? Math.ceil(finalListingPrice * MAGIC_EDEN_FEE_MULTIPLIER)
             : finalListingPrice;

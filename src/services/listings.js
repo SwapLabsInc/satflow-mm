@@ -100,7 +100,7 @@ async function listOnSatflow(item, listingPriceSats) {
     // After successful Satflow listing, also list on Magic Eden (for Ordinals only)
     if (!item.token.rune_amount) {
       try {
-        // Increase price by 0.5% for Magic Eden to account for maker fee
+        // Adjust price higher for Magic Eden to account for maker fee
         const magicEdenPrice = Math.ceil(listingPriceSats * MAGIC_EDEN_FEE_MULTIPLIER);
         await listOnMagicEden(item, magicEdenPrice);
       } catch (magicEdenError) {
