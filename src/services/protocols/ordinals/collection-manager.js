@@ -1,9 +1,10 @@
 const { BaseCollectionManager } = require('../../core/collection-manager');
 const { OrdinalsBiddingService } = require('./bidding');
-const { fetchMarketPrice, calculateAveragePrice } = require('./market');
+const { fetchMarketPrice, calculateAveragePrice, fetchMyListings } = require('./market');
 const { listOnSatflow } = require('../../listings');
-const { parseBidLadder } = require('../../core/environment');
+const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
+const { deriveWalletDetails } = require('../../wallet-utils');
 
 class OrdinalsCollectionManager extends BaseCollectionManager {
   constructor() {
@@ -340,6 +341,16 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
       }
     }
 
+    // Fetch my active listings from both Magic Eden and Satflow
+    const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
+    const myListings = await fetchMyListings(walletDetails.address, collectionId);
+    
+    // Create a lookup map for quick access by inscription ID
+    const listingsMap = new Map();
+    myListings.forEach(listing => {
+      listingsMap.set(listing.inscriptionId, listing);
+    });
+
     // Process items for this collection
     const collectionItems = walletItems.filter(item => item.collection?.id === collectionId);
     
@@ -361,20 +372,26 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           console.log(`ℹ Premium price for ${inscriptionId}: ${finalListingPrice} sats (${premiumMultiplier}x average)`);
         }
 
-        // Check if the item is already listed and within threshold
-        const existingListing = item.listing;
+        // Check if the item is already listed on either platform and within threshold
+        const existingListing = listingsMap.get(inscriptionId);
         let shouldList = true;
 
         if (existingListing) {
-          const priceDiff = Math.abs(existingListing.price - finalListingPrice);
+          // Calculate platform-specific target price
+          // Magic Eden listings are adjusted higher to account for maker fee
+          const targetPrice = existingListing.source === 'magiceden' 
+            ? Math.ceil(finalListingPrice * MAGIC_EDEN_FEE_MULTIPLIER)
+            : finalListingPrice;
+          
+          const priceDiff = Math.abs(existingListing.price - targetPrice);
           const priceChangePercent = priceDiff / existingListing.price;
           
           if (priceChangePercent <= updateThreshold) {
-            console.log(`ℹ Skipping ${inscriptionId}: Current price ${existingListing.price} sats is within ${updateThreshold * 100}% threshold`);
+            console.log(`ℹ Skipping ${inscriptionId}: Listed on ${existingListing.source} at ${existingListing.price} sats (within ${updateThreshold * 100}% threshold)`);
             shouldList = false;
           } else {
             console.log(`ℹ Updating ${inscriptionId}: Price change ${(priceChangePercent * 100).toFixed(2)}% exceeds ${updateThreshold * 100}% threshold`);
-            console.log(`  Current: ${existingListing.price} sats → New: ${finalListingPrice} sats`);
+            console.log(`  Current (${existingListing.source}): ${existingListing.price} sats → Target: ${targetPrice} sats`);
           }
         }
 

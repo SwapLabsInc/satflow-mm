@@ -161,7 +161,7 @@ class OrdinalsBiddingService {
       const unsignedMessage = `${walletDetails.address}:${walletDetails.tapKey}:${walletDetails.address}:${price}:${quantity}:${bidExpiry}:${collectionSlug}:${timestamp}`;
       
       // Sign the bidding message using BIP322
-      const signedBiddingMessage = signChallenge(unsignedMessage, process.env.LOCAL_WALLET_SEED);
+      const { signature: signedBiddingMessage } = signChallenge(unsignedMessage, process.env.LOCAL_WALLET_SEED);
       
       payload = {
         bidExpiry: bidExpiry,
