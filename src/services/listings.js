@@ -80,7 +80,7 @@ async function listOnSatflow(item, listingPriceSats) {
         sellerOrdAddress: walletDetails.address,
         sellerReceiveAddress: walletDetails.address,
         tapInternalKey: walletDetails.tapKey,
-        ...(item.token.rune_amount 
+        ...(item.token.rune_amount
           ? { runesOutput: item.token.inscription_id }
           : { inscriptionId: item.token.inscription_id }
         )
@@ -110,7 +110,7 @@ async function listOnSatflow(item, listingPriceSats) {
     return bulkListRes.data;
   } catch (error) {
     logError(`Failed to list ${item.token.inscription_id}: ${error.message}`);
-    
+
     // Debug logging for 400 and 500 errors
     if (error.response && (error.response.status === 400 || error.response.status === 500)) {
       const errorType = error.response.status === 400 ? '400 Bad Request' : '500 Internal Server Error';
@@ -125,7 +125,7 @@ async function listOnSatflow(item, listingPriceSats) {
       }
       logError('Request headers:', JSON.stringify(error.config?.headers, null, 2));
     }
-    
+
     throw error;
   }
 }
@@ -160,11 +160,6 @@ async function listOnMagicEden(item, listingPriceSats) {
       config
     );
 
-    // DEBUG: Log full intent response structure (REMOVE AFTER DEBUGGING)
-    console.log('DEBUG - Magic Eden Intent Response Structure:');
-    console.log('intentRes.data:', JSON.stringify(intentRes.data, null, 2));
-    console.log('intentRes.data.data:', JSON.stringify(intentRes.data.data, null, 2));
-
     const intentData = intentRes.data.data;
     if (!intentData.success || !intentData.results || intentData.results.length === 0) {
       throw new Error('No results found in Magic Eden intent response');
@@ -172,33 +167,23 @@ async function listOnMagicEden(item, listingPriceSats) {
 
     // Extract data from the first result (we're only listing one item at a time)
     const result = intentData.results[0];
-    
-    // DEBUG: Log result structure (REMOVE AFTER DEBUGGING)
-    console.log('DEBUG - First result structure:', JSON.stringify(result, null, 2));
+
     const unsignedCombinedPSBTBase64 = result.unsignedCombinedPSBTBase64;
-    const unsignedListingPSBTBase64 = result.unsignedListingPSBTBase64;
-    
-    if (!unsignedCombinedPSBTBase64 || !unsignedListingPSBTBase64) {
+    const unsignedRBFListingPsbtBase64 = result.listing.seller.unsignedRBFProtectedListingPSBT;
+    const unsignedRBFListingTransientPsbtBase64 = result.listing.seller.unsignedRBFProtectedListingTransientPSBT;
+
+    if (!unsignedCombinedPSBTBase64 || !unsignedRBFListingPsbtBase64) {
       throw new Error('Missing unsigned PSBTs in Magic Eden intent response');
     }
 
-    // DEBUG: Log intentData keys and check for messageToSign/sessionId (REMOVE AFTER DEBUGGING)
-    console.log('DEBUG - intentData keys:', Object.keys(intentData));
-    console.log('DEBUG - intentData.messageToSign:', intentData.messageToSign);
-    console.log('DEBUG - intentData.sessionId:', intentData.sessionId);
-
     const messageToSign = intentData.messageToSign;
-    const sessionId = intentData.sessionId;
+    const sessionId = intentData.sessionId ?? Math.round(Math.random() * 9999).toString();
 
-    if (!messageToSign || !sessionId) {
+    if (!messageToSign) {
       // DEBUG: More detailed error logging (REMOVE AFTER DEBUGGING)
       console.log('DEBUG - Missing fields! intentData:', JSON.stringify(intentData, null, 2));
-      throw new Error('Missing messageToSign or sessionId in Magic Eden intent response');
+      throw new Error('Missing messageToSign in Magic Eden intent response');
     }
-
-    // DEBUG: Log values found (REMOVE AFTER DEBUGGING)
-    console.log('DEBUG - Found messageToSign:', messageToSign);
-    console.log('DEBUG - Found sessionId:', sessionId);
 
     // Step 2: Sign PSBTs
     const derivationPath = process.env.CUSTOM_DERIVATION_PATH || DEFAULT_DERIVATION_PATH;
@@ -209,14 +194,18 @@ async function listOnMagicEden(item, listingPriceSats) {
 
     // Sign the combined PSBT (secure, all inputs)
     let combinedPsbt = bitcoin.Psbt.fromBase64(unsignedCombinedPSBTBase64, { network: bitcoin.networks.bitcoin });
-    const combinedInputsToSign = Array.from({ length: combinedPsbt.data.inputs.length }, (_, i) => i);
-    combinedPsbt = signPSBT(combinedPsbt, signingKey, true, combinedInputsToSign, walletDetails.tapKey);
+    combinedPsbt = signPSBT(combinedPsbt, signingKey, false, [0], walletDetails.tapKey);
     const signedCombinedPSBT = combinedPsbt.toBase64();
 
     // Sign the listing PSBT (secure, typically input 0)
-    let listingPsbt = bitcoin.Psbt.fromBase64(unsignedListingPSBTBase64, { network: bitcoin.networks.bitcoin });
+    let listingPsbt = bitcoin.Psbt.fromBase64(unsignedRBFListingPsbtBase64, { network: bitcoin.networks.bitcoin });
     listingPsbt = signPSBT(listingPsbt, signingKey, true, [0], walletDetails.tapKey);
     const signedListingPSBT = listingPsbt.toBase64();
+
+    // Sign the listing PSBT (secure, typically input 0)
+    let listingTransientPsbt = bitcoin.Psbt.fromBase64(unsignedRBFListingTransientPsbtBase64, { network: bitcoin.networks.bitcoin });
+    listingTransientPsbt = signPSBT(listingTransientPsbt, signingKey, true, [0], walletDetails.tapKey);
+    const signedListingTransientPSBT = listingTransientPsbt.toBase64()
 
     // Step 3: Sign BIP322 message
     const { signature: signedMessage, challenge: unsignedMessage } = signChallenge(
@@ -231,7 +220,7 @@ async function listOnMagicEden(item, listingPriceSats) {
         price: listingPriceSats,
         sellerReceiveAddress: walletDetails.address,
         signedRBFProtectedListingPSBT: signedListingPSBT,
-        signedRBFProtectedListingTransientPSBT: signedListingPSBT
+        signedRBFProtectedListingTransientPSBT: signedListingTransientPSBT
       }],
       signedCombinedPSBT: signedCombinedPSBT,
       sellerPublicKey: walletDetails.publicKey,
@@ -257,7 +246,8 @@ async function listOnMagicEden(item, listingPriceSats) {
     return submitRes.data;
   } catch (error) {
     logError(`Failed to list ${item.token.inscription_id} on Magic Eden: ${error.message}`);
-    
+    console.log(error.stack);
+
     // Debug logging for 400 and 500 errors
     if (error.response && (error.response.status === 400 || error.response.status === 500)) {
       const errorType = error.response.status === 400 ? '400 Bad Request' : '500 Internal Server Error';
@@ -272,7 +262,7 @@ async function listOnMagicEden(item, listingPriceSats) {
       }
       logError('Request headers:', JSON.stringify(error.config?.headers, null, 2));
     }
-    
+
     throw error;
   }
 }

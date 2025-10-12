@@ -23,8 +23,8 @@ function signPSBT(psbt, signingKey, isSecure, indicesToSign, tapKey) {
 
   // Use different sighash types for secure vs insecure
   const sighashType = isSecure ?
-    (SIGHASH_ALL | SIGHASH_ANYONECANPAY) :     // 0x81 for secure
-    (SIGHASH_SINGLE | SIGHASH_ANYONECANPAY);   // 0x83 for insecure
+    bitcoin.Transaction.SIGHASH_ALL | bitcoin.Transaction.SIGHASH_ANYONECANPAY :     // 0x81 for secure
+    bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY;   // 0x83 for insecure
 
   // Sign specified inputs
   for (const index of inputsToSign) {
