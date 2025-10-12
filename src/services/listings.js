@@ -100,7 +100,9 @@ async function listOnSatflow(item, listingPriceSats) {
     // After successful Satflow listing, also list on Magic Eden (for Ordinals only)
     if (!item.token.rune_amount) {
       try {
-        await listOnMagicEden(item, listingPriceSats);
+        // Increase price by 0.5% for Magic Eden to account for maker fee
+        const magicEdenPrice = Math.ceil(listingPriceSats * 1.005);
+        await listOnMagicEden(item, magicEdenPrice);
       } catch (magicEdenError) {
         // Log but don't fail the overall listing if Magic Eden fails
         logError(`Magic Eden listing failed, but Satflow listing succeeded: ${magicEdenError.message}`);
