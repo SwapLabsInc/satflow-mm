@@ -4,7 +4,7 @@ const { deriveWalletDetails, deriveSigningKey, DEFAULT_DERIVATION_PATH } = requi
 const { signPSBT, finalizePSBT } = require('./psbt-utils');
 const { signChallenge } = require('./bip322');
 const { logError } = require('../utils/logger');
-const { SATFLOW_API_BASE_URL } = require('./core/environment');
+const { SATFLOW_API_BASE_URL, MAGIC_EDEN_FEE_MULTIPLIER } = require('./core/environment');
 
 async function listOnSatflow(item, listingPriceSats) {
   let intentSellPayload; // Declare outside try block for debug access
@@ -101,7 +101,7 @@ async function listOnSatflow(item, listingPriceSats) {
     if (!item.token.rune_amount) {
       try {
         // Increase price by 0.5% for Magic Eden to account for maker fee
-        const magicEdenPrice = Math.ceil(listingPriceSats * 1.005);
+        const magicEdenPrice = Math.ceil(listingPriceSats * MAGIC_EDEN_FEE_MULTIPLIER);
         await listOnMagicEden(item, magicEdenPrice);
       } catch (magicEdenError) {
         // Log but don't fail the overall listing if Magic Eden fails

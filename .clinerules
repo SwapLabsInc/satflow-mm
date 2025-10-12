@@ -1,3 +1,5 @@
 When working on this node application, after making changes, let the user test manually
 
 Never read the .env file in the root directory for the project for any reason. If you need to understand the .env behavior, review the code itself to understand or the .env.sample file
+
+Non-duplicated variables that need to be shared across different modules should be defined in src/services/core/environment.js

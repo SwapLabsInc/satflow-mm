@@ -2,7 +2,7 @@ const { BaseCollectionManager } = require('../../core/collection-manager');
 const { OrdinalsBiddingService } = require('./bidding');
 const { fetchMarketPrice, calculateAveragePrice, fetchMyListings } = require('./market');
 const { listOnSatflow } = require('../../listings');
-const { parseBidLadder } = require('../../core/environment');
+const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
 
@@ -380,7 +380,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           // Calculate platform-specific target price
           // Magic Eden listings need to be 0.5% higher to account for maker fee
           const targetPrice = existingListing.source === 'magiceden' 
-            ? Math.ceil(finalListingPrice * 1.005)
+            ? Math.ceil(finalListingPrice * MAGIC_EDEN_FEE_MULTIPLIER)
             : finalListingPrice;
           
           const priceDiff = Math.abs(existingListing.price - targetPrice);
