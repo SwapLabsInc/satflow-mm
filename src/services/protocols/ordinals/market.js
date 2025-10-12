@@ -35,6 +35,59 @@ async function fetchSatflowListings(collectionId) {
   }
 }
 
+async function fetchMyListings(walletAddress, collectionSymbol) {
+  try {
+    // Fetch from both Magic Eden and Satflow in parallel
+    const [meData, satflowData] = await Promise.all([
+      (async () => {
+        const url = `https://api-mainnet.magiceden.us/v2/ord/btc/wallets/tokens?` +
+          `limit=100&offset=0&ownerAddress=${walletAddress}&showAll=true`;
+        try {
+          const { data } = await axios.get(url);
+          return data?.tokens || [];
+        } catch (error) {
+          logError(`Failed to fetch Magic Eden listings: ${error.message}`);
+          return [];
+        }
+      })(),
+      fetchSatflowListings(collectionSymbol)
+    ]);
+
+    // Filter Magic Eden results for the specific collection and listed items
+    const meListings = meData
+      .filter(item => item.collectionSymbol === collectionSymbol && item.listed)
+      .map(item => ({
+        source: 'magiceden',
+        inscriptionId: item.id,
+        price: item.listedPrice,
+        seller: item.owner
+      }));
+
+    // Filter Satflow results for the wallet address
+    const satflowListings = satflowData
+      .filter(item => item.ask && item.ask.sellerOrdAddress === walletAddress)
+      .map(item => ({
+        source: 'satflow',
+        inscriptionId: item.ask.inscriptionId,
+        price: item.ask.price,
+        seller: item.ask.sellerOrdAddress
+      }));
+
+    // Merge both sources
+    const allListings = [...meListings, ...satflowListings];
+
+    console.log(`\n📋 My Active Listings for ${collectionSymbol}:`);
+    console.log(`🔮 Magic Eden: ${meListings.length} listings`);
+    console.log(`⚡ Satflow: ${satflowListings.length} listings`);
+    console.log(`📊 Total: ${allListings.length} listings`);
+
+    return allListings;
+  } catch (error) {
+    logError(`Failed to fetch my listings: ${error.message}`);
+    return [];
+  }
+}
+
 async function fetchMarketPrice(collectionSymbol) {
   // Get addresses to filter out from listings
   const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
@@ -137,5 +190,6 @@ function calculateAveragePrice(listings, collectionSymbol) {
 
 module.exports = {
   fetchMarketPrice,
-  calculateAveragePrice
+  calculateAveragePrice,
+  fetchMyListings
 };
