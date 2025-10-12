@@ -204,7 +204,7 @@ async function listOnMagicEden(item, listingPriceSats) {
     listingPsbt = signPSBT(listingPsbt, signingKey, true, [0], walletDetails.tapKey);
     const signedListingPSBT = listingPsbt.toBase64();
 
-    // Sign the listing PSBT (secure, typically input 0)
+    // Sign the transient listing PSBT (secure, typically input 0)
     let listingTransientPsbt = bitcoin.Psbt.fromBase64(unsignedRBFListingTransientPsbtBase64, { network: bitcoin.networks.bitcoin });
     listingTransientPsbt = signPSBT(listingTransientPsbt, signingKey, true, [0], walletDetails.tapKey);
     const signedListingTransientPSBT = listingTransientPsbt.toBase64();
