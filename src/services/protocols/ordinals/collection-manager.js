@@ -377,7 +377,13 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         let shouldList = true;
 
         if (existingListing) {
-          const priceDiff = Math.abs(existingListing.price - finalListingPrice);
+          // Calculate platform-specific target price
+          // Magic Eden listings need to be 0.5% higher to account for maker fee
+          const targetPrice = existingListing.source === 'magiceden' 
+            ? Math.ceil(finalListingPrice * 1.005)
+            : finalListingPrice;
+          
+          const priceDiff = Math.abs(existingListing.price - targetPrice);
           const priceChangePercent = priceDiff / existingListing.price;
           
           if (priceChangePercent <= updateThreshold) {
@@ -385,7 +391,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
             shouldList = false;
           } else {
             console.log(`ℹ Updating ${inscriptionId}: Price change ${(priceChangePercent * 100).toFixed(2)}% exceeds ${updateThreshold * 100}% threshold`);
-            console.log(`  Current (${existingListing.source}): ${existingListing.price} sats → New: ${finalListingPrice} sats`);
+            console.log(`  Current (${existingListing.source}): ${existingListing.price} sats → Target: ${targetPrice} sats`);
           }
         }
 
