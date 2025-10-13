@@ -13,6 +13,17 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     this.biddingService = new OrdinalsBiddingService();
   }
 
+  getUpdateThreshold(collectionId) {
+    const collectionUpper = collectionId.toUpperCase();
+    const collectionThreshold = Number(process.env[`${collectionUpper}_UPDATE_THRESHOLD`]);
+    
+    if (process.env[`${collectionUpper}_UPDATE_THRESHOLD`] && !isNaN(collectionThreshold)) {
+      return collectionThreshold;
+    }
+    
+    return Number(process.env.UPDATE_THRESHOLD) || 0.01;
+  }
+
   validateProtocolEnvironment() {
     const required = [
       'LOCAL_WALLET_SEED',
@@ -208,7 +219,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     }
 
     // Get update threshold from environment
-    const updateThreshold = Number(process.env.UPDATE_THRESHOLD) || 0.01;
+    const updateThreshold = this.getUpdateThreshold(collectionId);
 
     // Always cancel existing bids when using ladder pricing or when price change exceeds threshold
     let shouldCancelBids = false;
@@ -395,6 +406,9 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         const existingListings = listingsMap.get(inscriptionId) || [];
         const satflowListing = existingListings.find(l => l.source === 'satflow');
         const magicEdenListing = existingListings.find(l => l.source === 'magiceden');
+
+        // Get update threshold for this collection
+        const updateThreshold = this.getUpdateThreshold(collectionId);
 
         // Check if we need to list/update on Satflow
         let shouldListSatflow = true;
