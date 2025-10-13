@@ -98,15 +98,15 @@ async function fetchCollectionBids(collectionSymbol) {
   ]);
 
   try {
-    // 1. Fetch Magic Eden Bids
+    // 1. Fetch Magic Eden Bids via ZenRows
+    if (!process.env.ZENROWS_API_KEY) {
+      logError('ZENROWS_API_KEY is not set. Cannot fetch Magic Eden bids.');
+      return [];
+    }
     const meBidsUrl = `https://api-mainnet.magiceden.io/v2/ord/btc/collection-offers/collection/${collectionSymbol}?sort=priceDesc&status[]=valid&offset=0`;
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-      'Referer': 'https://magiceden.io/',
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
-    };
-    const { data: meData } = await axios.get(meBidsUrl, { headers });
+    const zenrowsUrl = `https://api.zenrows.com/v1/?apikey=${process.env.ZENROWS_API_KEY}&url=${encodeURIComponent(meBidsUrl)}`;
+    
+    const { data: meData } = await axios.get(zenrowsUrl);
     
     const meBids = (meData.offers || [])
       // Filter out our own bids
