@@ -1,7 +1,7 @@
 const { BaseCollectionManager } = require('../../core/collection-manager');
 const { OrdinalsBiddingService } = require('./bidding');
-const { fetchMarketPrice, fetchMyListings } = require('./market');
-const { calculateTargetPrice, calculateDynamicPrice } = require('./pricing');
+const { fetchMarketPrice, fetchMyListings, fetchCollectionBids } = require('./market');
+const { calculateTargetPrice, calculateDynamicPrice, calculateDynamicBidPrice } = require('./pricing');
 const { listOnSatflow, listOnMagicEden } = require('../../listings');
 const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
@@ -99,6 +99,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     // Check for bid ladder configuration
     const collectionUpper = collectionId.toUpperCase();
     const bidLadderConfig = parseBidLadder(process.env[`${collectionUpper}_BID_LADDER`]);
+    const isBiddingEnabled = bidLadderConfig || process.env[`${collectionUpper}_BID_BELOW_PERCENT`];
     
     // Collection limit for bidding
     const collectionLimit = this.getCollectionBidLimit(collectionId);
@@ -107,6 +108,12 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     console.log(`- Average price: ${averagePrice} sats`);
     console.log(`- Listing price (${listAbovePercent}x): ${listingPriceSats} sats`);
     console.log(`- Collection bid limit: ${collectionLimit} sats`);
+    
+    // Fetch external bids only if bidding is enabled for this collection
+    let marketBids = [];
+    if (isBiddingEnabled) {
+      marketBids = await fetchCollectionBids(collectionId);
+    }
     
     // Determine bidding strategy (ladder or single price)
     let bidStrategy;
@@ -129,11 +136,14 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           // Round down to nearest 1000 sats to comply with Satflow API requirements
           price = Math.floor(maxAllowedBidPrice / 1000) * 1000;
         }
+
+        // Apply dynamic bidding logic
+        const dynamicPrice = calculateDynamicBidPrice(price, marketBids);
         
         return {
           pricePercent: step.pricePercent,
           allocation: step.allocation,
-          price,
+          price: dynamicPrice,
           // Quantity will be calculated later
           quantity: 0
         };
@@ -196,6 +206,10 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
       // Calculate bid price and ensure it's not too high compared to listings
       // IMPORTANT: For Ordinals, Satflow API requires prices to be in 1000 sat increments
       let bidPriceSats = Math.round(averagePrice * bidBelowPercent / 1000) * 1000;
+      
+      // Apply dynamic bidding logic
+      bidPriceSats = calculateDynamicBidPrice(bidPriceSats, marketBids);
+
       if (bidPriceSats > maxAllowedBidPrice) {
         console.log(`\nBid price ${bidPriceSats} sats would exceed maximum ratio of ${maxBidToListRatio * 100}% of lowest list price ${lowestListPrice} sats`);
         console.log(`Adjusting bid price down to maximum allowed: ${maxAllowedBidPrice} sats`);

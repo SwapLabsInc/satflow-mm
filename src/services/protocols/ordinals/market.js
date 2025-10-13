@@ -88,6 +88,58 @@ async function fetchMyListings(walletAddress, collectionSymbol) {
   }
 }
 
+async function fetchCollectionBids(collectionSymbol) {
+  // Get addresses to filter out from listings
+  const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
+  const myAddress = walletDetails.address;
+  const ignoredAddresses = new Set([
+    myAddress,
+    ...(process.env.IGNORED_MARKET_ADDRESSES || '').split(',').map(addr => addr.trim()).filter(addr => addr)
+  ]);
+
+  try {
+    // 1. Fetch Magic Eden Bids
+    const meBidsUrl = `https://api-mainnet.magiceden.io/v2/ord/btc/collection-offers/collection/${collectionSymbol}?sort=priceDesc&status[]=valid&offset=0`;
+    const { data: meData } = await axios.get(meBidsUrl);
+    
+    const meBids = (meData.offers || [])
+      // Filter out our own bids
+      .filter(offer => !ignoredAddresses.has(offer.maker))
+      .map(offer => {
+        // Adjust for ME's 2% taker fee to get the effective price to beat
+        const adjustedPrice = Math.ceil(offer.price.amount * 1.02);
+        return {
+          source: 'magiceden',
+          price: adjustedPrice,
+          maker: offer.maker,
+        };
+      });
+
+    // 2. Fetch Satflow Bids (Placeholder for future implementation)
+    // const satflowBids = []; 
+
+    // Combine and sort all bids
+    const allBids = [...meBids /*, ...satflowBids*/]
+      .sort((a, b) => b.price - a.price); // Sort descending
+
+    console.log(`\n📊 Collection Bid Analysis for ${collectionSymbol}:`);
+    console.log(`🔮 Magic Eden: ${meBids.length} active bids`);
+    if (meBids.length > 0) {
+      console.log(`   └─ Highest ME bid (after 2% fee adj): ${meBids[0].price.toLocaleString()} sats`);
+    }
+    // console.log(`⚡ Satflow: ${satflowBids.length} active bids`);
+
+    return allBids;
+
+  } catch (error) {
+    logError(`Collection bid fetch failed for ${collectionSymbol}: ${error.message}`);
+    if (error.response) {
+      logError(`   -> Status: ${error.response.status}, Data: ${JSON.stringify(error.response.data)}`);
+    }
+    return [];
+  }
+}
+
 async function fetchMarketPrice(collectionSymbol) {
   // Get addresses to filter out from listings
   const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
@@ -155,6 +207,7 @@ async function fetchMarketPrice(collectionSymbol) {
 }
 
 module.exports = {
+  fetchCollectionBids,
   fetchMarketPrice,
   fetchMyListings,
 };

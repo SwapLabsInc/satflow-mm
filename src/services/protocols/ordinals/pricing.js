@@ -28,7 +28,29 @@ function calculateDynamicPrice(targetPrice, marketListings) {
     return targetPrice;
 }
 
+function calculateDynamicBidPrice(targetBidPrice, marketBids) {
+    if (!marketBids || marketBids.length === 0) {
+        return targetBidPrice;
+    }
+
+    const highestBid = marketBids[0].price;
+
+    // Opportunistic Overbidding: If target is within 1% of highest bid, overbid by 1000 sats
+    if (targetBidPrice <= highestBid && targetBidPrice >= highestBid * 0.99) {
+        return highestBid + 1000;
+    }
+
+    // Just Above Highest: If target is already above highest bid, standardize to 1000 sats above
+    if (targetBidPrice > highestBid) {
+        return highestBid + 1000;
+    }
+
+    // Default: Return original target bid price
+    return targetBidPrice;
+}
+
 module.exports = {
   calculateTargetPrice,
   calculateDynamicPrice,
+  calculateDynamicBidPrice,
 };
