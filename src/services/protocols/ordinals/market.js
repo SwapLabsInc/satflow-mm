@@ -113,7 +113,7 @@ async function fetchCollectionBids(collectionSymbol) {
       .filter(offer => !ignoredAddresses.has(offer.maker))
       .map(offer => {
         // Adjust for ME's 2% taker fee to get the effective price to beat
-        const adjustedPrice = Math.ceil(offer.price.amount * 1.02);
+        const adjustedPrice = Math.ceil(offer.price.amount * 0.98);
         return {
           source: 'magiceden',
           price: adjustedPrice,
@@ -131,7 +131,7 @@ async function fetchCollectionBids(collectionSymbol) {
     console.log(`\n📊 Collection Bid Analysis for ${collectionSymbol}:`);
     console.log(`🔮 Magic Eden: ${meBids.length} active bids`);
     if (meBids.length > 0) {
-      console.log(`   └─ Highest ME bid (after 2% fee adj): ${meBids[0].price.toLocaleString()} sats`);
+      console.log(`   └─ Highest ME bid (effective price): ${meBids[0].price.toLocaleString()} sats`);
     }
     // console.log(`⚡ Satflow: ${satflowBids.length} active bids`);
 
