@@ -1,6 +1,7 @@
 const { BaseCollectionManager } = require('../../core/collection-manager');
 const { OrdinalsBiddingService } = require('./bidding');
-const { fetchMarketPrice, calculateAveragePrice, fetchMyListings } = require('./market');
+const { fetchMarketPrice, fetchMyListings } = require('./market');
+const { calculateTargetPrice, calculateDynamicPrice } = require('./pricing');
 const { listOnSatflow, listOnMagicEden } = require('../../listings');
 const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
@@ -53,7 +54,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
     // Fetch market data and calculate prices
     const tokens = await fetchMarketPrice(collectionId);
-    const averagePrice = calculateAveragePrice(tokens, collectionId);
+    const averagePrice = calculateTargetPrice(tokens, collectionId);
     if (averagePrice <= 0) {
       console.log(`No valid market data for ${collectionId}`);
       return;
@@ -73,7 +74,8 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
     // Calculate listing price using floored average price
     const listAbovePercent = Number(process.env[`${collectionId.toUpperCase()}_LIST_ABOVE_PERCENT`]) || 1.2;
-    const listingPriceSats = Math.floor(flooredAveragePrice * listAbovePercent);
+    let listingPriceSats = Math.floor(flooredAveragePrice * listAbovePercent);
+    listingPriceSats = calculateDynamicPrice(listingPriceSats, tokens);
     
     // Get max bid to list ratio
     const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);

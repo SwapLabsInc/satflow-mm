@@ -179,17 +179,7 @@ async function fetchMarketPrice(collectionSymbol) {
   }
 }
 
-function calculateAveragePrice(listings, collectionSymbol) {
-  const numCheapest = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
-  const slice = listings.slice(0, numCheapest);
-  if (slice.length === 0) return 0;
-
-  const total = slice.reduce((sum, item) => sum + item.price, 0);
-  return total / slice.length;
-}
-
 module.exports = {
   fetchMarketPrice,
-  calculateAveragePrice,
   fetchMyListings
 };
