@@ -53,8 +53,10 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     }
 
     // Fetch market data and calculate prices
-    const tokens = await fetchMarketPrice(collectionId);
-    const averagePrice = calculateTargetPrice(tokens, collectionId);
+    const { meListings, satflowListings } = await fetchMarketPrice(collectionId);
+    const allListings = [...meListings, ...satflowListings].sort((a, b) => a.price - b.price);
+    const averagePrice = calculateTargetPrice(allListings, collectionId);
+
     if (averagePrice <= 0) {
       console.log(`No valid market data for ${collectionId}`);
       return;
@@ -74,14 +76,13 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
     // Calculate listing price using floored average price
     const listAbovePercent = Number(process.env[`${collectionId.toUpperCase()}_LIST_ABOVE_PERCENT`]) || 1.2;
-    let listingPriceSats = Math.floor(flooredAveragePrice * listAbovePercent);
-    listingPriceSats = calculateDynamicPrice(listingPriceSats, tokens);
+    const listingPriceSats = Math.floor(flooredAveragePrice * listAbovePercent);
     
     // Get max bid to list ratio
     const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
     
     // Find lowest list price from market data
-    const lowestListPrice = Math.min(...tokens.map(t => t.price));
+    const lowestListPrice = allListings.length > 0 ? Math.min(...allListings.map(t => t.price)) : Infinity;
     const maxAllowedBidPrice = Math.floor(lowestListPrice * maxBidToListRatio);
     
     // Check for bid ladder configuration
@@ -369,63 +370,73 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
       try {
         const inscriptionId = item.token.inscription_id;
         const premiumMultiplier = this.getPremiumMultiplier(inscriptionId);
-        let finalListingPrice = listingPriceSats;
+        let targetListPrice = listingPriceSats; // Base price for this item
         
         if (premiumMultiplier) {
           // Use floored average price for premium inscriptions to respect price floor
-          finalListingPrice = Math.floor(flooredAveragePrice * premiumMultiplier);
-          console.log(`ℹ Premium price for ${inscriptionId}: ${finalListingPrice} sats (${premiumMultiplier}x average)`);
+          targetListPrice = Math.floor(flooredAveragePrice * premiumMultiplier);
+          console.log(`ℹ Premium price for ${inscriptionId}: ${targetListPrice} sats (${premiumMultiplier}x average)`);
+        }
+
+        // --- PLATFORM-SPECIFIC PRICING ---
+        // Calculate Satflow Price
+        const finalSatflowPrice = calculateDynamicPrice(targetListPrice, satflowListings);
+
+        // Calculate Magic Eden Price
+        const baseMagicEdenPrice = calculateDynamicPrice(targetListPrice, meListings);
+        let finalMagicEdenPrice = baseMagicEdenPrice;
+
+        // Apply ME fee multiplier ONLY if no undercutting occurred
+        if (baseMagicEdenPrice === targetListPrice) {
+          finalMagicEdenPrice = Math.ceil(baseMagicEdenPrice * MAGIC_EDEN_FEE_MULTIPLIER);
         }
 
         // Get all existing listings for this inscription
         const existingListings = listingsMap.get(inscriptionId) || [];
-        
-        // Check each platform independently
         const satflowListing = existingListings.find(l => l.source === 'satflow');
         const magicEdenListing = existingListings.find(l => l.source === 'magiceden');
-        
+
         // Check if we need to list/update on Satflow
         let shouldListSatflow = true;
         if (satflowListing) {
-          const priceDiff = Math.abs(satflowListing.price - finalListingPrice);
+          const priceDiff = Math.abs(satflowListing.price - finalSatflowPrice);
           const priceChangePercent = priceDiff / satflowListing.price;
           
           if (priceChangePercent <= updateThreshold) {
-            console.log(`ℹ Skipping Satflow for ${inscriptionId}: Listed at ${satflowListing.price} sats (within ${updateThreshold * 100}% threshold)`);
+            console.log(`ℹ Skipping Satflow for ${inscriptionId}: Listed at ${satflowListing.price} sats (within ${updateThreshold * 100}% threshold of ${finalSatflowPrice})`);
             shouldListSatflow = false;
           } else {
             console.log(`ℹ Updating Satflow for ${inscriptionId}: Price change ${(priceChangePercent * 100).toFixed(2)}% exceeds threshold`);
-            console.log(`  Current: ${satflowListing.price} sats → Target: ${finalListingPrice} sats`);
+            console.log(`  Current: ${satflowListing.price} sats → Target: ${finalSatflowPrice} sats`);
           }
         }
         
         // Check if we need to list/update on Magic Eden
-        const magicEdenTargetPrice = Math.ceil(finalListingPrice * MAGIC_EDEN_FEE_MULTIPLIER);
         let shouldListMagicEden = true;
         if (magicEdenListing) {
-          const priceDiff = Math.abs(magicEdenListing.price - magicEdenTargetPrice);
+          const priceDiff = Math.abs(magicEdenListing.price - finalMagicEdenPrice);
           const priceChangePercent = priceDiff / magicEdenListing.price;
           
           if (priceChangePercent <= updateThreshold) {
-            console.log(`ℹ Skipping Magic Eden for ${inscriptionId}: Listed at ${magicEdenListing.price} sats (within ${updateThreshold * 100}% threshold)`);
+            console.log(`ℹ Skipping Magic Eden for ${inscriptionId}: Listed at ${magicEdenListing.price} sats (within ${updateThreshold * 100}% threshold of ${finalMagicEdenPrice})`);
             shouldListMagicEden = false;
           } else {
             console.log(`ℹ Updating Magic Eden for ${inscriptionId}: Price change ${(priceChangePercent * 100).toFixed(2)}% exceeds threshold`);
-            console.log(`  Current: ${magicEdenListing.price} sats → Target: ${magicEdenTargetPrice} sats`);
+            console.log(`  Current: ${magicEdenListing.price} sats → Target: ${finalMagicEdenPrice} sats`);
           }
         }
 
         // List on Satflow if needed
         if (shouldListSatflow) {
-          await listOnSatflow(item, finalListingPrice);
-          console.log(`✓ Listed ${inscriptionId} on Satflow at ${finalListingPrice} sats`);
+          await listOnSatflow(item, finalSatflowPrice);
+          console.log(`✓ Listed ${inscriptionId} on Satflow at ${finalSatflowPrice} sats`);
         }
         
         // List on Magic Eden if needed (independent of Satflow)
         if (shouldListMagicEden) {
           try {
-            await listOnMagicEden(item, magicEdenTargetPrice);
-            console.log(`✓ Listed ${inscriptionId} on Magic Eden at ${magicEdenTargetPrice} sats`);
+            await listOnMagicEden(item, finalMagicEdenPrice);
+            console.log(`✓ Listed ${inscriptionId} on Magic Eden at ${finalMagicEdenPrice} sats`);
           } catch (magicEdenError) {
             logError(`Magic Eden listing failed for ${inscriptionId}: ${magicEdenError.message}`);
           }

@@ -143,36 +143,11 @@ async function fetchMarketPrice(collectionSymbol) {
       console.log(`   └─ Price range: ${satflowPrices[0].toLocaleString()} - ${satflowPrices[satflowPrices.length - 1].toLocaleString()} sats`);
     }
 
-    // Deduplicate listings by inscription ID, keeping the lower price
-    const listingsByInscription = new Map();
-    
-    [...meListings, ...satflowListings].forEach(listing => {
-      const existingListing = listingsByInscription.get(listing.inscriptionId);
-      if (!existingListing || listing.price < existingListing.price) {
-        listingsByInscription.set(listing.inscriptionId, listing);
-      }
-    });
+    // Sort each list by price independently
+    meListings.sort((a, b) => a.price - b.price);
+    satflowListings.sort((a, b) => a.price - b.price);
 
-    // Convert back to array and sort by price
-    const allListings = Array.from(listingsByInscription.values())
-      .sort((a, b) => a.price - b.price);
-
-    console.log(`🔄 After deduplication: ${allListings.length} unique listings`);
-    if (allListings.length > 0) {
-      const finalPrices = allListings.map(l => l.price);
-      console.log(`   └─ Final price range: ${finalPrices[0].toLocaleString()} - ${finalPrices[finalPrices.length - 1].toLocaleString()} sats`);
-      
-      // Show source breakdown in final listings
-      const sourceBreakdown = allListings.reduce((acc, listing) => {
-        acc[listing.source] = (acc[listing.source] || 0) + 1;
-        return acc;
-      }, {});
-      console.log(`   └─ Source breakdown:`, sourceBreakdown);
-    } else {
-      console.log('❌ No listings found after filtering');
-    }
-
-    return allListings;
+    return { meListings, satflowListings };
   } catch (error) {
     logError(`Market price fetch failed: ${error.message}`);
     return [];
@@ -181,5 +156,5 @@ async function fetchMarketPrice(collectionSymbol) {
 
 module.exports = {
   fetchMarketPrice,
-  fetchMyListings
+  fetchMyListings,
 };
