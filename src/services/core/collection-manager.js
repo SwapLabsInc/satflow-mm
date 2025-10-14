@@ -1,4 +1,4 @@
-const { validateBaseEnvironment } = require('./environment');
+const { validateBaseEnvironment, parsePremiumRanges } = require('./environment');
 const { logError } = require('../../utils/logger');
 
 class BaseCollectionManager {
@@ -38,7 +38,25 @@ class BaseCollectionManager {
     return collections.split(',').map(c => c.trim()).filter(c => c.length > 0);
   }
 
-  getPremiumMultiplier(itemId) {
+  getPremiumMultiplier(itemId, floorPriceBtc) {
+    // Check for dynamic premium ranges first
+    const rangesKey = `PREMIUM_INSCRIPTION_${itemId}_RANGES`;
+    const rangesString = process.env[rangesKey];
+
+    if (rangesString) {
+      const ranges = parsePremiumRanges(rangesString);
+      if (ranges && !ranges.error) {
+        for (const range of ranges) {
+          if (floorPriceBtc <= range.threshold) {
+            return range.multiplier;
+          }
+        }
+      } else if (ranges && ranges.error) {
+        logError(`Invalid premium ranges for ${itemId}: ${ranges.error}`);
+      }
+    }
+
+    // Fallback to static premium if no dynamic ranges match or are configured
     const premiumKey = `PREMIUM_INSCRIPTION_${itemId}`;
     const premiumMultiplier = Number(process.env[premiumKey]);
     return premiumMultiplier || null;

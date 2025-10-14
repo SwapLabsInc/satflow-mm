@@ -41,6 +41,29 @@ function parseBidLadder(ladderString) {
   }
 }
 
+// Helper function to parse and validate premium inscription ranges
+function parsePremiumRanges(rangesString) {
+  if (!rangesString) return null;
+
+  try {
+    const ranges = rangesString.split(',').map(range => {
+      const [threshold, multiplier] = range.split(':').map(Number);
+      if (isNaN(threshold) || isNaN(multiplier)) {
+        throw new Error('Invalid format - each range must be threshold:multiplier');
+      }
+      if (threshold <= 0 || multiplier <= 0) {
+        throw new Error('Threshold and multiplier must be positive numbers');
+      }
+      return { threshold, multiplier };
+    });
+
+    // Sort ranges by threshold in ascending order
+    return ranges.sort((a, b) => a.threshold - b.threshold);
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
 function validateWalletEnvironment(password) {
   // Check for either encrypted or plaintext seed
   if (!process.env.LOCAL_WALLET_SEED && !process.env.LOCAL_WALLET_SEED_ENCRYPTED) {
@@ -259,5 +282,6 @@ module.exports = {
   validateBaseEnvironment,
   validateWalletEnvironment,
   parseBidLadder,
+  parsePremiumRanges,
   checkBelowFloorListings
 };
