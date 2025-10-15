@@ -7,6 +7,9 @@ const SATFLOW_API_BASE_URL = 'https://api.satflow.com/v1';
 // Magic Eden maker fee multiplier (0.5% fee)
 const MAGIC_EDEN_FEE_MULTIPLIER = 1.005;
 
+// Magic Eden taker fee multiplier (2%)
+const MAGIC_EDEN_TAKER_FEE_MULTIPLIER = 1.02;
+
 // Global flag to track if below-floor confirmation has been given
 let belowFloorConfirmationGiven = false;
 
@@ -279,6 +282,7 @@ function validateBaseEnvironment() {
 module.exports = {
   SATFLOW_API_BASE_URL,
   MAGIC_EDEN_FEE_MULTIPLIER,
+  MAGIC_EDEN_TAKER_FEE_MULTIPLIER,
   validateBaseEnvironment,
   validateWalletEnvironment,
   parseBidLadder,

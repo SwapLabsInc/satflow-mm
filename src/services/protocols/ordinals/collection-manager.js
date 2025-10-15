@@ -1,7 +1,7 @@
 const { BaseCollectionManager } = require('../../core/collection-manager');
 const { OrdinalsBiddingService } = require('./bidding');
 const { fetchMarketPrice, fetchMyListings, fetchCollectionBids } = require('./market');
-const { calculateTargetPrice, calculateDynamicPrice, calculateDynamicBidPrice } = require('./pricing');
+const { calculateTargetPrice, calculateDynamicPrice, calculateDynamicBidPrice, calculateSatflowDynamicPrice } = require('./pricing');
 const { listOnSatflow, listOnMagicEden } = require('../../listings');
 const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
@@ -405,7 +405,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
         // --- PLATFORM-SPECIFIC PRICING ---
         // Calculate Satflow Price
-        let finalSatflowPrice = calculateDynamicPrice(targetListPrice, satflowListings);
+        let finalSatflowPrice = calculateSatflowDynamicPrice(targetListPrice, meListings, satflowListings);
 
         // Calculate Magic Eden Price
         const baseMagicEdenPrice = calculateDynamicPrice(targetListPrice, meListings);
@@ -414,13 +414,6 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         // Apply ME fee multiplier ONLY if no undercutting occurred
         if (baseMagicEdenPrice === targetListPrice) {
           finalMagicEdenPrice = Math.ceil(baseMagicEdenPrice * MAGIC_EDEN_FEE_MULTIPLIER);
-        }
-
-        // --- CROSS-MARKET ADJUSTMENT ---
-        // If the final ME price is lower than the final Satflow price, match it.
-        if (finalMagicEdenPrice < finalSatflowPrice) {
-            console.log(`ℹ Matching ME's aggressive price on Satflow: ${finalMagicEdenPrice} sats (was ${finalSatflowPrice})`);
-            finalSatflowPrice = finalMagicEdenPrice;
         }
 
         // Get all existing listings for this inscription

@@ -1,3 +1,5 @@
+const { MAGIC_EDEN_TAKER_FEE_MULTIPLIER } = require('../../core/environment');
+
 function calculateTargetPrice(listings, collectionSymbol) {
   const numCheapest = Number(process.env[`${collectionSymbol.toUpperCase()}_NUM_CHEAPEST_ITEMS`]) || 10;
   const slice = listings.slice(0, numCheapest);
@@ -49,8 +51,32 @@ function calculateDynamicBidPrice(targetBidPrice, marketBids) {
     return targetBidPrice;
 }
 
+function calculateSatflowDynamicPrice(targetPrice, meListings, satflowListings) {
+    const meFloor = meListings.length > 0 ? meListings[0].price * MAGIC_EDEN_TAKER_FEE_MULTIPLIER : Infinity;
+    const satflowFloor = satflowListings.length > 0 ? satflowListings[0].price : Infinity;
+    const trueFloor = Math.min(meFloor, satflowFloor);
+
+    if (!isFinite(trueFloor)) {
+        return targetPrice;
+    }
+
+    // Opportunistic Undercutting: If target is within 1% of the true floor, undercut by 1000 sats
+    if (targetPrice >= trueFloor && targetPrice <= trueFloor * 1.01) {
+        return trueFloor - 1000;
+    }
+
+    // Just Below Floor: If target is already below floor, standardize to 1000 sats below
+    if (targetPrice < trueFloor) {
+        return trueFloor - 1000;
+    }
+
+    // Default: Return original target price
+    return targetPrice;
+}
+
 module.exports = {
   calculateTargetPrice,
   calculateDynamicPrice,
   calculateDynamicBidPrice,
+  calculateSatflowDynamicPrice,
 };
