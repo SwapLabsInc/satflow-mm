@@ -66,6 +66,9 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     // Fetch market data and calculate prices
     const { meListings, satflowListings } = await fetchMarketPrice(collectionId);
     const allListings = [...meListings, ...satflowListings].sort((a, b) => a.price - b.price);
+    const lowestListPrice = allListings.length > 0 ? allListings[0].price : Infinity;
+    const floorPriceBtc = lowestListPrice / 100000000;
+
     const averagePrice = calculateTargetPrice(allListings, collectionId);
 
     if (averagePrice <= 0) {
@@ -91,9 +94,6 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     
     // Get max bid to list ratio
     const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
-    
-    // Find lowest list price from market data
-    const lowestListPrice = allListings.length > 0 ? Math.min(...allListings.map(t => t.price)) : Infinity;
     const maxAllowedBidPrice = Math.floor(lowestListPrice * maxBidToListRatio);
     
     // Check for bid ladder configuration
@@ -394,7 +394,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     for (const item of collectionItems) {
       try {
         const inscriptionId = item.token.inscription_id;
-        const premiumMultiplier = this.getPremiumMultiplier(inscriptionId);
+        const premiumMultiplier = this.getPremiumMultiplier(inscriptionId, floorPriceBtc);
         let targetListPrice = listingPriceSats; // Base price for this item
         
         if (premiumMultiplier) {
