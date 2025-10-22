@@ -9,23 +9,23 @@ function calculateTargetPrice(listings, collectionSymbol) {
 
 function calculateDynamicPrice(targetPrice, marketListings) {
     if (!marketListings || marketListings.length === 0) {
-        return targetPrice;
+        return { price: targetPrice, isUndercut: false };
     }
 
     const floorPrice = marketListings[0].price;
 
     // Opportunistic Undercutting: If target is within 1% of floor, undercut by 1000 sats
     if (targetPrice >= floorPrice && targetPrice <= floorPrice * 1.01) {
-        return floorPrice - 1000;
+        return { price: floorPrice - 1000, isUndercut: true };
     }
 
     // Just Below Floor: If target is already below floor, standardize to 1000 sats below
     if (targetPrice < floorPrice) {
-        return floorPrice - 1000;
+        return { price: floorPrice - 1000, isUndercut: true };
     }
 
     // Default: Return original target price
-    return targetPrice;
+    return { price: targetPrice, isUndercut: false };
 }
 
 function calculateDynamicBidPrice(targetBidPrice, marketBids) {
