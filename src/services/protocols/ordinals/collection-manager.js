@@ -405,15 +405,15 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
         // --- PLATFORM-SPECIFIC PRICING ---
         // Calculate Satflow Price
-        let finalSatflowPrice = calculateDynamicPrice(targetListPrice, satflowListings);
+        let { price: finalSatflowPrice, isUndercut: isSatflowUndercut } = calculateDynamicPrice(targetListPrice, satflowListings);
 
         // Calculate Magic Eden Price
-        const baseMagicEdenPrice = calculateDynamicPrice(targetListPrice, meListings);
-        let finalMagicEdenPrice = baseMagicEdenPrice;
+        const { price: mePrice, isUndercut: isMeUndercut } = calculateDynamicPrice(targetListPrice, meListings);
+        let finalMagicEdenPrice = mePrice;
 
         // Apply ME fee multiplier ONLY if no undercutting occurred
-        if (baseMagicEdenPrice === targetListPrice) {
-          finalMagicEdenPrice = Math.ceil(baseMagicEdenPrice * MAGIC_EDEN_FEE_MULTIPLIER);
+        if (!isMeUndercut) {
+          finalMagicEdenPrice = Math.ceil(mePrice * MAGIC_EDEN_FEE_MULTIPLIER);
         }
 
         // --- CROSS-MARKET ADJUSTMENT ---
@@ -421,6 +421,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         if (finalMagicEdenPrice < finalSatflowPrice) {
             console.log(`ℹ Matching ME's aggressive price on Satflow: ${finalMagicEdenPrice} sats (was ${finalSatflowPrice})`);
             finalSatflowPrice = finalMagicEdenPrice;
+            isSatflowUndercut = true; // ME undercut is now a Satflow undercut
         }
 
         // Get all existing listings for this inscription
@@ -437,7 +438,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           const priceDiff = Math.abs(satflowListing.price - finalSatflowPrice);
           const priceChangePercent = priceDiff / satflowListing.price;
           
-          if (priceChangePercent <= updateThreshold) {
+          if (!isSatflowUndercut && priceChangePercent <= updateThreshold) {
             console.log(`ℹ Skipping Satflow for ${inscriptionId}: Listed at ${satflowListing.price} sats (within ${updateThreshold * 100}% threshold of ${finalSatflowPrice})`);
             shouldListSatflow = false;
           } else {
@@ -452,7 +453,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
           const priceDiff = Math.abs(magicEdenListing.price - finalMagicEdenPrice);
           const priceChangePercent = priceDiff / magicEdenListing.price;
           
-          if (priceChangePercent <= updateThreshold) {
+          if (!isMeUndercut && priceChangePercent <= updateThreshold) {
             console.log(`ℹ Skipping Magic Eden for ${inscriptionId}: Listed at ${magicEdenListing.price} sats (within ${updateThreshold * 100}% threshold of ${finalMagicEdenPrice})`);
             shouldListMagicEden = false;
           } else {
