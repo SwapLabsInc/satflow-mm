@@ -11,23 +11,25 @@ function calculateTargetPrice(listings, collectionSymbol) {
 
 function calculateDynamicPrice(targetPrice, marketListings) {
     if (!marketListings || marketListings.length === 0) {
-        return targetPrice;
+        return { price: targetPrice, isUndercut: false };
     }
 
     const floorPrice = marketListings[0].price;
+    let isUndercut = false;
 
     // Opportunistic Undercutting: If target is within 1% of floor, undercut by 1000 sats
     if (targetPrice >= floorPrice && targetPrice <= floorPrice * 1.01) {
-        return floorPrice - 1000;
+        isUndercut = true;
+        return { price: floorPrice - 1000, isUndercut };
     }
 
     // Just Below Floor: If target is already below floor, standardize to 1000 sats below
     if (targetPrice < floorPrice) {
-        return floorPrice - 1000;
+        return { price: floorPrice - 1000, isUndercut };
     }
 
     // Default: Return original target price
-    return targetPrice;
+    return { price: targetPrice, isUndercut };
 }
 
 function calculateDynamicBidPrice(targetBidPrice, marketBids) {
@@ -55,23 +57,25 @@ function calculateSatflowDynamicPrice(targetPrice, meListings, satflowListings) 
     const meFloor = meListings.length > 0 ? meListings[0].price * MAGIC_EDEN_TAKER_FEE_MULTIPLIER : Infinity;
     const satflowFloor = satflowListings.length > 0 ? satflowListings[0].price : Infinity;
     const trueFloor = Math.min(meFloor, satflowFloor);
+    let isUndercut = false;
 
     if (!isFinite(trueFloor)) {
-        return targetPrice;
+        return { price: targetPrice, isUndercut };
     }
 
     // Opportunistic Undercutting: If target is within 1% of the true floor, undercut by 1000 sats
     if (targetPrice >= trueFloor && targetPrice <= trueFloor * 1.01) {
-        return trueFloor - 1000;
+        isUndercut = true;
+        return { price: trueFloor - 1000, isUndercut };
     }
 
     // Just Below Floor: If target is already below floor, standardize to 1000 sats below
     if (targetPrice < trueFloor) {
-        return trueFloor - 1000;
+        return { price: trueFloor - 1000, isUndercut };
     }
 
     // Default: Return original target price
-    return targetPrice;
+    return { price: targetPrice, isUndercut };
 }
 
 module.exports = {

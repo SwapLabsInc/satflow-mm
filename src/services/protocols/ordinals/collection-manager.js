@@ -405,14 +405,14 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
         // --- PLATFORM-SPECIFIC PRICING ---
         // Calculate Satflow Price
-        let finalSatflowPrice = calculateSatflowDynamicPrice(targetListPrice, meListings, satflowListings);
+        const { price: finalSatflowPrice } = calculateSatflowDynamicPrice(targetListPrice, meListings, satflowListings);
 
         // Calculate Magic Eden Price
-        const baseMagicEdenPrice = calculateDynamicPrice(targetListPrice, meListings);
+        const { price: baseMagicEdenPrice, isUndercut: isMagicEdenUndercut } = calculateDynamicPrice(targetListPrice, meListings);
         let finalMagicEdenPrice = baseMagicEdenPrice;
 
         // Apply ME fee multiplier ONLY if no undercutting occurred
-        if (baseMagicEdenPrice === targetListPrice) {
+        if (!isMagicEdenUndercut) {
           finalMagicEdenPrice = Math.ceil(baseMagicEdenPrice * MAGIC_EDEN_FEE_MULTIPLIER);
         }
 
@@ -444,8 +444,17 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         if (magicEdenListing) {
           const priceDiff = Math.abs(magicEdenListing.price - finalMagicEdenPrice);
           const priceChangePercent = priceDiff / magicEdenListing.price;
-          
-          if (priceChangePercent <= updateThreshold) {
+        
+          if (isMagicEdenUndercut) {
+            // If undercutting, ignore threshold and update if price is different
+            if (priceDiff === 0) {
+              console.log(`ℹ Skipping Magic Eden for ${inscriptionId}: Already listed at undercut price of ${finalMagicEdenPrice} sats`);
+              shouldListMagicEden = false;
+            } else {
+              console.log(`ℹ Updating Magic Eden for ${inscriptionId}: Undercutting floor price.`);
+              console.log(`  Current: ${magicEdenListing.price} sats → New Undercut: ${finalMagicEdenPrice} sats`);
+            }
+          } else if (priceChangePercent <= updateThreshold) {
             console.log(`ℹ Skipping Magic Eden for ${inscriptionId}: Listed at ${magicEdenListing.price} sats (within ${updateThreshold * 100}% threshold of ${finalMagicEdenPrice})`);
             shouldListMagicEden = false;
           } else {
