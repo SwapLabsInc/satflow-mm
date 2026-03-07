@@ -3,7 +3,7 @@ const { OrdinalsBiddingService } = require('./bidding');
 const { fetchMarketPrice, fetchMyListings, fetchCollectionBids } = require('./market');
 const { calculateTargetPrice, calculateDynamicPrice, calculateDynamicBidPrice } = require('./pricing');
 const { listOnSatflow, listOnMagicEden } = require('../../listings');
-const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER } = require('../../core/environment');
+const { parseBidLadder, MAGIC_EDEN_FEE_MULTIPLIER, isMagicEdenEnabled } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
 
@@ -40,6 +40,10 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
   async processCollection(collectionId, walletItems, biddingAddress, biddingBalance) {
     console.log(`\n=== Processing ${collectionId} ===`);
     console.log(`Using bidding wallet: ${biddingAddress} (${biddingBalance} sats)`);
+    const useMagicEden = isMagicEdenEnabled();
+    if (!useMagicEden) {
+      console.log('Magic Eden integrations are disabled for this run');
+    }
 
     // Get existing bids for this collection
     let existingBids = [];
@@ -64,7 +68,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
     }
 
     // Fetch market data and calculate prices
-    const { meListings, satflowListings } = await fetchMarketPrice(collectionId);
+    const { meListings, satflowListings } = await fetchMarketPrice(collectionId, { includeMagicEden: useMagicEden });
     const allListings = [...meListings, ...satflowListings].sort((a, b) => a.price - b.price);
     const lowestListPrice = allListings.length > 0 ? allListings[0].price : Infinity;
     const floorPriceBtc = lowestListPrice / 100000000;
@@ -371,7 +375,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
 
     // Fetch my active listings from both Magic Eden and Satflow
     const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
-    const myListings = await fetchMyListings(walletDetails.address, collectionId);
+    const myListings = await fetchMyListings(walletDetails.address, collectionId, { includeMagicEden: useMagicEden });
     
     // Create a lookup map that stores all listings per inscription ID
     const listingsMap = new Map();
@@ -407,27 +411,33 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         // Calculate Satflow Price
         let { price: finalSatflowPrice, isUndercut: isSatflowUndercut } = calculateDynamicPrice(targetListPrice, satflowListings);
 
-        // Calculate Magic Eden Price
-        const { price: mePrice, isUndercut: isMeUndercut } = calculateDynamicPrice(targetListPrice, meListings);
-        let finalMagicEdenPrice = mePrice;
+        let finalMagicEdenPrice = null;
+        let isMeUndercut = false;
+        if (useMagicEden) {
+          // Calculate Magic Eden Price
+          const mePricing = calculateDynamicPrice(targetListPrice, meListings);
+          const mePrice = mePricing.price;
+          isMeUndercut = mePricing.isUndercut;
+          finalMagicEdenPrice = mePrice;
 
-        // Apply ME fee multiplier ONLY if no undercutting occurred
-        if (!isMeUndercut) {
-          finalMagicEdenPrice = Math.ceil(mePrice * MAGIC_EDEN_FEE_MULTIPLIER);
-        }
+          // Apply ME fee multiplier ONLY if no undercutting occurred
+          if (!isMeUndercut) {
+            finalMagicEdenPrice = Math.ceil(mePrice * MAGIC_EDEN_FEE_MULTIPLIER);
+          }
 
-        // --- CROSS-MARKET ADJUSTMENT ---
-        // If the final ME price is lower than the final Satflow price, match it.
-        if (finalMagicEdenPrice < finalSatflowPrice) {
+          // --- CROSS-MARKET ADJUSTMENT ---
+          // If the final ME price is lower than the final Satflow price, match it.
+          if (finalMagicEdenPrice < finalSatflowPrice) {
             console.log(`ℹ Matching ME's aggressive price on Satflow: ${finalMagicEdenPrice} sats (was ${finalSatflowPrice})`);
             finalSatflowPrice = finalMagicEdenPrice;
             isSatflowUndercut = true; // ME undercut is now a Satflow undercut
+          }
         }
 
         // Get all existing listings for this inscription
         const existingListings = listingsMap.get(inscriptionId) || [];
         const satflowListing = existingListings.find(l => l.source === 'satflow');
-        const magicEdenListing = existingListings.find(l => l.source === 'magiceden');
+        const magicEdenListing = useMagicEden ? existingListings.find(l => l.source === 'magiceden') : null;
 
         // Get update threshold for this collection
         const updateThreshold = this.getUpdateThreshold(collectionId);
@@ -448,8 +458,8 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         }
         
         // Check if we need to list/update on Magic Eden
-        let shouldListMagicEden = true;
-        if (magicEdenListing) {
+        let shouldListMagicEden = useMagicEden;
+        if (useMagicEden && magicEdenListing) {
           const priceDiff = Math.abs(magicEdenListing.price - finalMagicEdenPrice);
           const priceChangePercent = priceDiff / magicEdenListing.price;
           
@@ -469,7 +479,7 @@ class OrdinalsCollectionManager extends BaseCollectionManager {
         }
         
         // List on Magic Eden if needed (independent of Satflow)
-        if (shouldListMagicEden) {
+        if (useMagicEden && shouldListMagicEden) {
           try {
             await listOnMagicEden(item, finalMagicEdenPrice);
             console.log(`✓ Listed ${inscriptionId} on Magic Eden at ${finalMagicEdenPrice} sats`);

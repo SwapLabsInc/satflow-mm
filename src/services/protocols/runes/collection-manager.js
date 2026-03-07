@@ -76,7 +76,17 @@ class RunesCollectionManager extends BaseCollectionManager {
     const maxBidToListRatio = Number(process.env.MAX_BID_TO_LIST_RATIO || process.env.MIN_BID_TO_LIST_RATIO);
     
     // Find lowest list price from market data
-    const lowestListPrice = Math.min(...orders.map(o => o.price));
+    const lowestListPrice = orders.reduce((lowest, order) => {
+      const unitPrice = Number(order.price ?? order.formattedUnitPrice);
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        return lowest;
+      }
+      return Math.min(lowest, unitPrice);
+    }, Infinity);
+    if (!Number.isFinite(lowestListPrice)) {
+      console.log(`No valid market prices found for ${envTicker}`);
+      return;
+    }
     const maxAllowedBidPrice = Math.floor(lowestListPrice * maxBidToListRatio);
     
     // Get max bid total for this rune

@@ -170,7 +170,8 @@ function validateBaseEnvironment() {
   const baseRequired = [
     'COLLECTIONS',
     'UPDATE_THRESHOLD',
-    'MAX_BID_TO_LIST_RATIO'
+    'MAX_BID_TO_LIST_RATIO',
+    'SATFLOW_API_KEY'
   ];
   
   const missing = baseRequired.filter(key => !process.env[key]);
@@ -276,6 +277,10 @@ function validateBaseEnvironment() {
   }
 }
 
+function isMagicEdenEnabled() {
+  return String(process.env.ENABLE_MAGIC_EDEN || '').toLowerCase() === 'true';
+}
+
 module.exports = {
   SATFLOW_API_BASE_URL,
   MAGIC_EDEN_FEE_MULTIPLIER,
@@ -283,5 +288,6 @@ module.exports = {
   validateWalletEnvironment,
   parseBidLadder,
   parsePremiumRanges,
-  checkBelowFloorListings
+  checkBelowFloorListings,
+  isMagicEdenEnabled
 };

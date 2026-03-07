@@ -1,7 +1,14 @@
 const axios = require('axios');
 const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
-const { SATFLOW_API_BASE_URL } = require('../../core/environment');
+const { SATFLOW_API_BASE_URL, isMagicEdenEnabled } = require('../../core/environment');
+
+function shouldUseMagicEden(options = {}) {
+  if (typeof options.includeMagicEden === 'boolean') {
+    return options.includeMagicEden;
+  }
+  return isMagicEdenEnabled();
+}
 
 async function fetchSatflowListings(collectionId) {
   const url = `${SATFLOW_API_BASE_URL}/activity/listings?collectionSlug=${collectionId}&sortBy=price&sortDirection=asc&active=true`;
@@ -35,21 +42,38 @@ async function fetchSatflowListings(collectionId) {
   }
 }
 
-async function fetchMyListings(walletAddress, collectionSymbol) {
+async function fetchMagicEdenWalletListings(walletAddress) {
+  const url = `https://api-mainnet.magiceden.us/v2/ord/btc/wallets/tokens?` +
+    `limit=100&offset=0&ownerAddress=${walletAddress}&showAll=true`;
   try {
-    // Fetch from both Magic Eden and Satflow in parallel
+    const { data } = await axios.get(url);
+    return data?.tokens || [];
+  } catch (error) {
+    logError(`Failed to fetch Magic Eden wallet listings: ${error.message}`);
+    return [];
+  }
+}
+
+async function fetchMagicEdenCollectionListings(collectionSymbol) {
+  const url = 'https://api-mainnet.magiceden.us/v2/ord/btc/tokens?' +
+    `offset=0&limit=100&collectionSymbol[]=${collectionSymbol}&sortBy=priceAsc` +
+    '&disablePendingTransactions=true&showAll=true&rbfPreventionListingOnly=false';
+  try {
+    const { data } = await axios.get(url);
+    return data?.tokens || [];
+  } catch (error) {
+    logError(`Failed to fetch Magic Eden market listings: ${error.message}`);
+    return [];
+  }
+}
+
+async function fetchMyListings(walletAddress, collectionSymbol, options = {}) {
+  try {
+    const includeMagicEden = shouldUseMagicEden(options);
+
+    // Fetch Satflow always; Magic Eden only when explicitly enabled.
     const [meData, satflowData] = await Promise.all([
-      (async () => {
-        const url = `https://api-mainnet.magiceden.us/v2/ord/btc/wallets/tokens?` +
-          `limit=100&offset=0&ownerAddress=${walletAddress}&showAll=true`;
-        try {
-          const { data } = await axios.get(url);
-          return data?.tokens || [];
-        } catch (error) {
-          logError(`Failed to fetch Magic Eden listings: ${error.message}`);
-          return [];
-        }
-      })(),
+      includeMagicEden ? fetchMagicEdenWalletListings(walletAddress) : Promise.resolve([]),
       fetchSatflowListings(collectionSymbol)
     ]);
 
@@ -77,7 +101,11 @@ async function fetchMyListings(walletAddress, collectionSymbol) {
     const allListings = [...meListings, ...satflowListings];
 
     console.log(`\n📋 My Active Listings for ${collectionSymbol}:`);
-    console.log(`🔮 Magic Eden: ${meListings.length} listings`);
+    if (includeMagicEden) {
+      console.log(`🔮 Magic Eden: ${meListings.length} listings`);
+    } else {
+      console.log('🔮 Magic Eden: disabled');
+    }
     console.log(`⚡ Satflow: ${satflowListings.length} listings`);
     console.log(`📊 Total: ${allListings.length} listings`);
 
@@ -89,6 +117,10 @@ async function fetchMyListings(walletAddress, collectionSymbol) {
 }
 
 async function fetchCollectionBids(collectionSymbol) {
+  if (!isMagicEdenEnabled()) {
+    return [];
+  }
+
   // Get addresses to filter out from listings
   const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
   const myAddress = walletDetails.address;
@@ -100,7 +132,7 @@ async function fetchCollectionBids(collectionSymbol) {
   try {
     // 1. Fetch Magic Eden Bids via ZenRows
     if (!process.env.ZENROWS_API_KEY) {
-      logError('ZENROWS_API_KEY is not set. Cannot fetch Magic Eden bids.');
+      console.log('ZENROWS_API_KEY is not set. Skipping Magic Eden bid feed.');
       return [];
     }
     const meBidsUrl = `https://api-mainnet.magiceden.io/v2/ord/btc/collection-offers/collection/${collectionSymbol}?sort=priceDesc&status[]=valid&offset=0`;
@@ -146,7 +178,7 @@ async function fetchCollectionBids(collectionSymbol) {
   }
 }
 
-async function fetchMarketPrice(collectionSymbol) {
+async function fetchMarketPrice(collectionSymbol, options = {}) {
   // Get addresses to filter out from listings
   const walletDetails = deriveWalletDetails(process.env.LOCAL_WALLET_SEED);
   const currentAddress = walletDetails.address;
@@ -156,15 +188,11 @@ async function fetchMarketPrice(collectionSymbol) {
   ]);
 
   try {
-    // Fetch both ME and Satflow listings
+    const includeMagicEden = shouldUseMagicEden(options);
+
+    // Fetch Satflow always; Magic Eden only when explicitly enabled.
     const [meData, satflowData] = await Promise.all([
-      (async () => {
-        const url = 'https://api-mainnet.magiceden.us/v2/ord/btc/tokens?' +
-          `offset=0&limit=100&collectionSymbol[]=${collectionSymbol}&sortBy=priceAsc` +
-          '&disablePendingTransactions=true&showAll=true&rbfPreventionListingOnly=false';
-        const { data } = await axios.get(url);
-        return data?.tokens || [];
-      })(),
+      includeMagicEden ? fetchMagicEdenCollectionListings(collectionSymbol) : Promise.resolve([]),
       fetchSatflowListings(collectionSymbol)
     ]);
 
@@ -189,8 +217,12 @@ async function fetchMarketPrice(collectionSymbol) {
 
     // Debug: Show market data from each source
     console.log(`\n📊 Market Analysis for ${collectionSymbol}:`);
-    console.log(`🔮 Magic Eden: ${meListings.length} listings`);
-    if (meListings.length > 0) {
+    if (includeMagicEden) {
+      console.log(`🔮 Magic Eden: ${meListings.length} listings`);
+    } else {
+      console.log('🔮 Magic Eden: disabled');
+    }
+    if (includeMagicEden && meListings.length > 0) {
       const mePrices = meListings.map(l => l.price).sort((a, b) => a - b);
       console.log(`   └─ Price range: ${mePrices[0].toLocaleString()} - ${mePrices[mePrices.length - 1].toLocaleString()} sats`);
     }
@@ -208,7 +240,7 @@ async function fetchMarketPrice(collectionSymbol) {
     return { meListings, satflowListings };
   } catch (error) {
     logError(`Market price fetch failed: ${error.message}`);
-    return [];
+    return { meListings: [], satflowListings: [] };
   }
 }
 

@@ -2,8 +2,8 @@
 
 This Node.js application automates bidding and listing for Ordinals/Rune marketplace items. It currently uses:
 
-- Magic Eden (as a price index source)
-- Satflow (for listing items and, later, placing bids)
+- Satflow (for wallet data, market data, listing items, and placing bids)
+- Magic Eden (optional, only when explicitly enabled)
 
 The application supports both Ordinals collections and Runes:
 - Ordinals collections (e.g., Runestone, NodeMonkes)
@@ -32,7 +32,8 @@ The application supports both Ordinals collections and Runes:
 | `LOOP_SECONDS` | Interval (in seconds) for each run | 15 |
 | `UPDATE_THRESHOLD` | Minimum price difference (as decimal) required before updating listings/bids | 0.01 (1%) |
 | `IGNORED_MARKET_ADDRESSES` | Comma-separated list of wallet addresses whose listings should be excluded from price calculations | - |
-| `ZENROWS_API_KEY` | API key for ZenRows (used to proxy or scrape data from Magic Eden) | - |
+| `ENABLE_MAGIC_EDEN` | Enables optional Magic Eden integrations (`true`/`false`) | `false` |
+| `ZENROWS_API_KEY` | API key for ZenRows (only used when `ENABLE_MAGIC_EDEN=true` to fetch Ordinals bid feed) | - |
 
 ### Collection-Specific Variables
 
@@ -58,6 +59,7 @@ For Runes (e.g., DOGGOTOTHEMOON), the following variables can be set:
 | `{RUNE_TICKER}_BID_BELOW_PERCENT` | Multiplier to bid below the average price (e.g., 0.8 = 80% of average) | 0.8 |
 | `{RUNE_TICKER}_BID_LADDER` | Alternative to BID_BELOW_PERCENT: Defines multiple price points with allocations (e.g., "0.9:0.2,0.85:0.3,0.8:0.5") | - |
 | `{RUNE_TICKER}_MAX_BID_TOTAL` | Maximum total amount in sats to bid on this rune | Infinity |
+| `{RUNE_TICKER}_FULL_TICKER` | **Required**: Full rune name with separators for Satflow mapping (e.g., `DOG•GO•TO•THE•MOON`) | - |
 
 ### Premium Inscription Pricing
 
@@ -109,7 +111,8 @@ For enhanced security, especially in production environments, you can encrypt yo
    ```
 
 5. **Signing into Marketplaces**:
-   - Ensure that your wallet address in `.env` matches the address you use on Satflow and Magic Eden
+   - Ensure that your wallet address in `.env` matches the address you use on Satflow
+   - If `ENABLE_MAGIC_EDEN=true`, this address should also match your Magic Eden wallet
    - This address should hold the Ordinal inscriptions and Runes you intend to list
 
 ## How It Works
@@ -117,8 +120,9 @@ For enhanced security, especially in production environments, you can encrypt yo
 1. **Collection/Rune Configuration**: The bot processes multiple collections and runes specified in the `COLLECTIONS` environment variable.
 
 2. **Fetch Price Data**: 
-   - For Ordinals collections: Calls Magic Eden to get listed items and their sat prices
-   - For Runes: Calls Magic Eden's runes API to get order book data
+   - For Ordinals collections: Calls Satflow to get listed items and their sat prices
+   - For Runes: Calls Satflow listings to build rune order data by depth
+   - If `ENABLE_MAGIC_EDEN=true`, Magic Eden feeds are used as optional secondary inputs/fallbacks
 
 3. **Calculate Average**: 
    - For Ordinals: Gathers the cheapest N items (default: 10, configurable via `{COLLECTION}_NUM_CHEAPEST_ITEMS`) to compute a baseline average price
