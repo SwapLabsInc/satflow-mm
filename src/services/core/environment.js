@@ -273,8 +273,19 @@ function validateBaseEnvironment() {
   }
 }
 
+function getSatflowConfig(params = {}) {
+  return {
+    params,
+    headers: {
+      Accept: 'application/json',
+      'x-api-key': process.env.SATFLOW_API_KEY
+    }
+  };
+}
+
 module.exports = {
   SATFLOW_API_BASE_URL,
+  getSatflowConfig,
   validateBaseEnvironment,
   validateWalletEnvironment,
   parseBidLadder,

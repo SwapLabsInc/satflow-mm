@@ -1,19 +1,9 @@
 const axios = require('axios');
 const { logError } = require('../../../utils/logger');
 const { deriveWalletDetails } = require('../../wallet-utils');
-const { SATFLOW_API_BASE_URL } = require('../../core/environment');
+const { SATFLOW_API_BASE_URL, getSatflowConfig } = require('../../core/environment');
 
-let hasLoggedSatflowBidFeedUnavailable = false;
-
-function getSatflowConfig(params = {}) {
-  return {
-    params,
-    headers: {
-      Accept: 'application/json',
-      'x-api-key': process.env.SATFLOW_API_KEY
-    }
-  };
-}
+const loggedSatflowBidFeedErrors = new Set();
 
 function normalizeSatflowListing(item) {
   const ask = item?.ask;
@@ -102,8 +92,8 @@ async function fetchSatflowBids(collectionId) {
 
     return data.data?.bids || data.data?.results || [];
   } catch (error) {
-    if (!hasLoggedSatflowBidFeedUnavailable) {
-      hasLoggedSatflowBidFeedUnavailable = true;
+    if (!loggedSatflowBidFeedErrors.has(collectionId)) {
+      loggedSatflowBidFeedErrors.add(collectionId);
       logError(`Satflow bid feed unavailable for '${collectionId}': ${error.message}`);
     }
     return [];
