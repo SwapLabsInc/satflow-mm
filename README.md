@@ -2,8 +2,7 @@
 
 This Node.js application automates bidding and listing for Ordinals/Rune marketplace items. It currently uses:
 
-- Magic Eden (as a price index source)
-- Satflow (for listing items and, later, placing bids)
+- Satflow (for market data, listing items, and placing bids)
 
 The application supports both Ordinals collections and Runes:
 - Ordinals collections (e.g., Runestone, NodeMonkes)
@@ -32,7 +31,6 @@ The application supports both Ordinals collections and Runes:
 | `LOOP_SECONDS` | Interval (in seconds) for each run | 15 |
 | `UPDATE_THRESHOLD` | Minimum price difference (as decimal) required before updating listings/bids | 0.01 (1%) |
 | `IGNORED_MARKET_ADDRESSES` | Comma-separated list of wallet addresses whose listings should be excluded from price calculations | - |
-| `ZENROWS_API_KEY` | API key for ZenRows (used to proxy or scrape data from Magic Eden) | - |
 
 ### Collection-Specific Variables
 
@@ -109,7 +107,7 @@ For enhanced security, especially in production environments, you can encrypt yo
    ```
 
 5. **Signing into Marketplaces**:
-   - Ensure that your wallet address in `.env` matches the address you use on Satflow and Magic Eden
+   - Ensure that your wallet address in `.env` matches the address you use on Satflow
    - This address should hold the Ordinal inscriptions and Runes you intend to list
 
 ## How It Works
@@ -117,8 +115,8 @@ For enhanced security, especially in production environments, you can encrypt yo
 1. **Collection/Rune Configuration**: The bot processes multiple collections and runes specified in the `COLLECTIONS` environment variable.
 
 2. **Fetch Price Data**: 
-   - For Ordinals collections: Calls Magic Eden to get listed items and their sat prices
-   - For Runes: Calls Magic Eden's runes API to get order book data
+   - For Ordinals collections: Calls Satflow to get active listings and their sat prices
+   - For Runes: Calls Satflow to get active rune listings and derive unit prices from them
 
 3. **Calculate Average**: 
    - For Ordinals: Gathers the cheapest N items (default: 10, configurable via `{COLLECTION}_NUM_CHEAPEST_ITEMS`) to compute a baseline average price
@@ -140,12 +138,12 @@ For enhanced security, especially in production environments, you can encrypt yo
 
    **Note for Ordinals**: Due to Satflow API requirements, all Ordinals bid prices are automatically rounded to 1000 sat increments (e.g., 3,000, 4,000, 5,000 sats). This rounding is handled automatically by the bot.
 
-8. **Modularity**: The code supports multiple collections and runes, and is written to extend to multiple marketplaces in the future.
+8. **Modularity**: The code supports multiple collections and runes while keeping market interactions centralized around Satflow.
 
 ## Notes
 
 - Always confirm your transactions on test environment or small amounts first to ensure correctness
-- For advanced features (like multi-collection or multi-marketplace), you can expand the logic in `src/index.js`
+- For advanced collection-specific behavior, you can expand the logic in `src/index.js`
 
 ## Disclaimer
 

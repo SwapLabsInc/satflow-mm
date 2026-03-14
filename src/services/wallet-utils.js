@@ -38,7 +38,7 @@ function deriveWalletDetails(seed) {
   // Get tap key (full public key in hex)
   const tapKey = Buffer.from(child.publicKey).toString('hex');
   
-  // Get public key in hex format (for Magic Eden)
+  // Get public key in hex format for downstream signing flows
   const publicKey = Buffer.from(child.publicKey).toString('hex');
   
   return {

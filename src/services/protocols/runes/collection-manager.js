@@ -28,8 +28,8 @@ class RunesCollectionManager extends BaseCollectionManager {
     // Remove any 'rune:' prefix if present
     const envTicker = runeTicker.replace(/^rune:/i, '');
     
-    // Keep ticker in original case for API
-    const apiTicker = envTicker;
+    // Satflow uses the full rune ticker as the collection slug when available.
+    const apiTicker = process.env[`${envTicker}_FULL_TICKER`] || envTicker;
     
     // Use uppercase for env var names
     const depthKey = `${envTicker}_MARKET_DEPTH_SATS`;
