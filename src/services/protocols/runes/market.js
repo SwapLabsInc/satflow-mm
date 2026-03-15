@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { SATFLOW_API_BASE_URL } = require('../../core/environment');
+const { SATFLOW_API_BASE_URL, getSatflowConfig } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
 
 /**
@@ -7,16 +7,6 @@ const { logError } = require('../../../utils/logger');
  * @param {string} runeTicker - The rune collection slug used by Satflow
  * @returns {Promise<Array>} Array of normalized sell orders
  */
-function getSatflowConfig(params = {}) {
-  return {
-    params,
-    headers: {
-      Accept: 'application/json',
-      'x-api-key': process.env.SATFLOW_API_KEY
-    }
-  };
-}
-
 function toBigInt(value) {
   if (typeof value === 'bigint') {
     return value;
@@ -80,10 +70,10 @@ function normalizeRuneOrder(listing) {
     amountString = bigIntToDecimal(rawAmount, divisibility);
   } else {
     const displayAmount = Number(
-      listing?.token?.inscription_number ??
-      listing?.token?.inscriptionNumber ??
       listing?.token?.amount ??
-      listing?.quantity
+      listing?.quantity ??
+      listing?.token?.inscription_number ??
+      listing?.token?.inscriptionNumber
     );
 
     if (!Number.isFinite(displayAmount) || displayAmount <= 0) {
