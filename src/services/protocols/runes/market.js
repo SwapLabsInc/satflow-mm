@@ -71,9 +71,7 @@ function normalizeRuneOrder(listing) {
   } else {
     const displayAmount = Number(
       listing?.token?.amount ??
-      listing?.quantity ??
-      listing?.token?.inscription_number ??
-      listing?.token?.inscriptionNumber
+      listing?.quantity
     );
 
     if (!Number.isFinite(displayAmount) || displayAmount <= 0) {
