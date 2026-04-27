@@ -35,11 +35,24 @@ function bigIntToDecimal(value, divisibility) {
   return `${whole.toString()}.${fraction.toString().padStart(divisibility, '0').replace(/0+$/, '')}`;
 }
 
+function firstRune(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getRuneData(listing) {
+  return (
+    firstRune(listing?.runes) ??
+    firstRune(listing?.ask?.runesData?.runes) ??
+    firstRune(listing?.rune) ??
+    firstRune(listing?.ask?.runes) ??
+    firstRune(listing?.runesData?.runes)
+  );
+}
+
 function getRuneDivisibility(listing) {
+  const runeData = getRuneData(listing);
   const divisibility = Number(
-    listing?.rune?.divisibility ??
-    listing?.runes?.[0]?.divisibility ??
-    listing?.ask?.runes?.[0]?.divisibility ??
+    runeData?.divisibility ??
     listing?.collection?.rune_divisibility ??
     listing?.token?.rune_divisibility ??
     0
@@ -49,6 +62,7 @@ function getRuneDivisibility(listing) {
 }
 
 function normalizeRuneOrder(listing) {
+  const runeData = getRuneData(listing);
   const totalPrice = Number(listing?.ask?.price ?? listing?.price);
   const explicitUnitPrice = Number(
     listing?.unitPrice ??
@@ -58,9 +72,7 @@ function normalizeRuneOrder(listing) {
   );
   const divisibility = getRuneDivisibility(listing);
   const rawAmount = toBigInt(
-    listing?.rune?.amount ??
-    listing?.runes?.[0]?.amount ??
-    listing?.ask?.runes?.[0]?.amount ??
+    runeData?.amount ??
     listing?.token?.rune_amount ??
     listing?.token?.runeAmount
   );
@@ -112,7 +124,7 @@ async function fetchRuneOrders(runeTicker) {
       `${SATFLOW_API_BASE_URL}/activity/listings`,
       getSatflowConfig({
         collectionSlug: runeTicker,
-        sortBy: 'price',
+        sortBy: 'unitPrice',
         sortDirection: 'asc',
         active: true
       })

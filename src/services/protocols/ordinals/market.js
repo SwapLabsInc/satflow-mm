@@ -24,13 +24,19 @@ function normalizeSatflowListing(item) {
 }
 
 function normalizeSatflowBid(item) {
+  const bid = item?.bid;
   const price = Number(
     item?.price ??
-    item?.bid?.price ??
+    bid?.price ??
     item?.bidPrice ??
     item?.amount
   );
-  const maker = item?.bidderAddress || item?.bidderTokenReceiveAddress || item?.maker || item?.bidder?.address;
+  const maker = bid?.bidderAddress ||
+    bid?.bidderTokenReceiveAddress ||
+    item?.bidderAddress ||
+    item?.bidderTokenReceiveAddress ||
+    item?.maker ||
+    item?.bidder?.address;
 
   if (!maker || !Number.isFinite(price) || price <= 0) {
     return null;
