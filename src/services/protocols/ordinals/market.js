@@ -65,6 +65,12 @@ function normalizeSatflowBid(item) {
     .map(address => address.trim());
   const uniqueBidderAddresses = [...new Set(bidderAddresses)];
   const attribute = bid?.attribute ?? item?.attribute;
+  const inscriptionId = bid?.inscriptionId ??
+    bid?.inscription_id ??
+    item?.inscriptionId ??
+    item?.inscription_id ??
+    item?.token?.inscription_id ??
+    item?.token?.id;
 
   if (!Number.isFinite(price) || price <= 0) {
     return null;
@@ -75,7 +81,8 @@ function normalizeSatflowBid(item) {
     price,
     maker: uniqueBidderAddresses[0],
     bidderAddresses: uniqueBidderAddresses,
-    attribute
+    attribute,
+    inscriptionId
   };
 }
 
@@ -168,7 +175,9 @@ async function fetchCollectionBids(collectionSymbol) {
           return false;
         }
 
-        return !bid.attribute && !bid.bidderAddresses.some(address => ignoredAddresses.has(address));
+        return !bid.attribute &&
+          !bid.inscriptionId &&
+          !bid.bidderAddresses.some(address => ignoredAddresses.has(address));
       })
       .sort((a, b) => b.price - a.price);
 
