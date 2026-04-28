@@ -53,12 +53,17 @@ function normalizeSatflowBid(item) {
     item?.bidPrice ??
     item?.amount
   );
-  const maker = bid?.bidderAddress ||
-    bid?.bidderTokenReceiveAddress ||
-    item?.bidderAddress ||
-    item?.bidderTokenReceiveAddress ||
-    item?.maker ||
-    item?.bidder?.address;
+  const bidderAddresses = [
+    bid?.bidderAddress,
+    bid?.bidderTokenReceiveAddress,
+    item?.bidderAddress,
+    item?.bidderTokenReceiveAddress,
+    item?.maker,
+    item?.bidder?.address
+  ]
+    .filter(address => typeof address === 'string' && address.trim())
+    .map(address => address.trim());
+  const uniqueBidderAddresses = [...new Set(bidderAddresses)];
 
   if (!Number.isFinite(price) || price <= 0) {
     return null;
@@ -67,7 +72,8 @@ function normalizeSatflowBid(item) {
   return {
     source: 'satflow',
     price,
-    maker
+    maker: uniqueBidderAddresses[0],
+    bidderAddresses: uniqueBidderAddresses
   };
 }
 
@@ -155,7 +161,13 @@ async function fetchCollectionBids(collectionSymbol) {
   try {
     const satflowBids = (await fetchSatflowBids(collectionSymbol))
       .map(normalizeSatflowBid)
-      .filter(bid => bid && (!bid.maker || !ignoredAddresses.has(bid.maker)))
+      .filter(bid => {
+        if (!bid) {
+          return false;
+        }
+
+        return !bid.bidderAddresses.some(address => ignoredAddresses.has(address));
+      })
       .sort((a, b) => b.price - a.price);
 
     console.log(`\n📊 Collection Bid Analysis for ${collectionSymbol}:`);
