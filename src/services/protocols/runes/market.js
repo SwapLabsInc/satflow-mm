@@ -1,33 +1,198 @@
 const axios = require('axios');
+const { SATFLOW_API_BASE_URL, getSatflowConfig } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
 
+const RUNE_ORDER_PAGE_SIZE = 100;
+
 /**
- * Fetches valid sell orders for a rune from Magic Eden
- * @param {string} runeTicker - The rune's ticker symbol
- * @returns {Promise<Array>} Array of valid sell orders
+ * Fetches valid sell orders for a rune from Satflow.
+ * @param {string} runeTicker - The rune collection slug used by Satflow
+ * @param {number} depthSats - Market depth in satoshis to cover before stopping
+ * @returns {Promise<Array>} Array of normalized sell orders
  */
-async function fetchRuneOrders(runeTicker) {
+function getActivityItems(data, ...legacyKeys) {
+  const activityData = data?.data;
+
+  if (Array.isArray(activityData?.items)) {
+    return activityData.items;
+  }
+
+  for (const key of legacyKeys) {
+    if (Array.isArray(activityData?.[key])) {
+      return activityData[key];
+    }
+  }
+
+  return [];
+}
+
+function toBigInt(value) {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return BigInt(Math.trunc(value));
+  }
+
+  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
+    return BigInt(value.trim());
+  }
+
+  return null;
+}
+
+function bigIntToDecimal(value, divisibility) {
+  const divisor = BigInt(10) ** BigInt(divisibility);
+  const whole = value / divisor;
+  const fraction = value % divisor;
+
+  if (fraction === 0n) {
+    return whole.toString();
+  }
+
+  return `${whole.toString()}.${fraction.toString().padStart(divisibility, '0').replace(/0+$/, '')}`;
+}
+
+function firstRune(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getRuneData(listing) {
+  return (
+    firstRune(listing?.runes) ??
+    firstRune(listing?.ask?.runesData?.runes) ??
+    firstRune(listing?.rune) ??
+    firstRune(listing?.ask?.runes) ??
+    firstRune(listing?.runesData?.runes)
+  );
+}
+
+function getRuneDivisibility(listing) {
+  const runeData = getRuneData(listing);
+  const divisibility = Number(
+    runeData?.divisibility ??
+    listing?.collection?.rune_divisibility ??
+    listing?.token?.rune_divisibility ??
+    0
+  );
+
+  return Number.isFinite(divisibility) && divisibility >= 0 ? divisibility : 0;
+}
+
+function normalizeRuneOrder(listing) {
+  const runeData = getRuneData(listing);
+  const totalPrice = Number(listing?.ask?.price ?? listing?.price);
+  const explicitUnitPrice = Number(
+    listing?.unitPrice ??
+    listing?.ask?.unitPrice ??
+    listing?.pricePerUnit ??
+    listing?.ask?.pricePerUnit
+  );
+  const divisibility = getRuneDivisibility(listing);
+  const rawAmount = toBigInt(
+    runeData?.amount ??
+    listing?.token?.rune_amount ??
+    listing?.token?.runeAmount
+  );
+
+  let amountString;
+  if (rawAmount !== null) {
+    amountString = bigIntToDecimal(rawAmount, divisibility);
+  } else {
+    const displayAmount = Number(
+      listing?.formattedAmount ??
+      listing?.amount ??
+      listing?.runeAmount ??
+      listing?.token?.amount ??
+      listing?.token?.rune_amount_formatted ??
+      listing?.quantity ??
+      listing?.token?.inscription_number ??
+      listing?.token?.inscriptionNumber
+    );
+
+    if (!Number.isFinite(displayAmount) || displayAmount <= 0) {
+      return null;
+    }
+
+    amountString = displayAmount.toString();
+  }
+
+  const amount = Number(amountString);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const unitPrice = Number.isFinite(explicitUnitPrice) && explicitUnitPrice > 0
+    ? explicitUnitPrice
+    : totalPrice / amount;
+
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+    return null;
+  }
+
+  return {
+    side: 'sell',
+    status: 'valid',
+    isPending: false,
+    price: unitPrice,
+    formattedAmount: amountString,
+    formattedUnitPrice: unitPrice.toString()
+  };
+}
+
+function calculateOrderValue(order) {
+  const amount = Number(order.formattedAmount);
+  const unitPrice = Number(order.formattedUnitPrice);
+  const value = amount * unitPrice;
+
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+async function fetchRuneOrders(runeTicker, depthSats) {
+  const orders = [];
+  const shouldFetchToDepth = Number.isFinite(depthSats) && depthSats > 0;
+  let accumulatedValue = 0;
+  let page = 1;
+  let totalPages = Infinity;
+
   try {
-    // Get orders sorted by price ascending for optimal market depth calculation
-    const url = `https://api-mainnet.magiceden.us/v2/ord/btc/runes/orders/${runeTicker}` +
-      '?offset=0&sort=unitPriceAsc&includePending=false&side=sell';
+    while (page <= totalPages) {
+      const { data } = await axios.get(
+        `${SATFLOW_API_BASE_URL}/activity/listings`,
+        getSatflowConfig({
+          collectionSlug: runeTicker,
+          sortBy: 'unitPrice',
+          sortDirection: 'asc',
+          active: true,
+          page,
+          pageSize: RUNE_ORDER_PAGE_SIZE
+        })
+      );
 
-    const { data } = await axios.get(url);
-    
-    // Filter for valid sell orders with proper numeric values
-    return (data?.orders || []).filter(order => {
-      if (!order || order.side !== 'sell' || order.status !== 'valid' || order.isPending) {
-        return false;
+      const items = getActivityItems(data, 'listings');
+      const normalizedOrders = items
+        .map(normalizeRuneOrder)
+        .filter(order => order !== null);
+
+      orders.push(...normalizedOrders);
+      accumulatedValue += normalizedOrders.reduce((sum, order) => sum + calculateOrderValue(order), 0);
+
+      const responseTotalPages = Number(data?.data?.pagination?.totalPages);
+      if (Number.isFinite(responseTotalPages) && responseTotalPages > 0) {
+        totalPages = responseTotalPages;
+      } else if (items.length < RUNE_ORDER_PAGE_SIZE) {
+        break;
       }
 
-      try {
-        const amount = parseFloat(order.formattedAmount);
-        const unitPrice = parseFloat(order.formattedUnitPrice);
-        return !isNaN(amount) && !isNaN(unitPrice) && amount > 0 && unitPrice > 0;
-      } catch {
-        return false;
+      if (!shouldFetchToDepth || accumulatedValue >= depthSats || items.length === 0) {
+        break;
       }
-    });
+
+      page += 1;
+    }
+
+    return orders;
   } catch (error) {
     logError(`Rune market price fetch failed: ${error.message}`);
     return [];

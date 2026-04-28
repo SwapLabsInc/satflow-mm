@@ -73,7 +73,7 @@ function signChallenge(challenge, seed) {
       challenge
     );
     
-    // Return both signature and original challenge for Magic Eden
+    // Return both signature and original challenge for downstream auth flows
     return {
       signature,
       challenge

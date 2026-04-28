@@ -4,9 +4,6 @@ const { logError } = require('../../utils/logger');
 // API Base URL - change this single line to test against different endpoints
 const SATFLOW_API_BASE_URL = 'https://api.satflow.com/v1';
 
-// Magic Eden maker fee multiplier (0.5% fee)
-const MAGIC_EDEN_FEE_MULTIPLIER = 1.005;
-
 // Global flag to track if below-floor confirmation has been given
 let belowFloorConfirmationGiven = false;
 
@@ -276,9 +273,19 @@ function validateBaseEnvironment() {
   }
 }
 
+function getSatflowConfig(params = {}) {
+  return {
+    params,
+    headers: {
+      Accept: 'application/json',
+      'x-api-key': process.env.SATFLOW_API_KEY
+    }
+  };
+}
+
 module.exports = {
   SATFLOW_API_BASE_URL,
-  MAGIC_EDEN_FEE_MULTIPLIER,
+  getSatflowConfig,
   validateBaseEnvironment,
   validateWalletEnvironment,
   parseBidLadder,
