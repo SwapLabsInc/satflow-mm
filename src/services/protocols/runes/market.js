@@ -2,9 +2,12 @@ const axios = require('axios');
 const { SATFLOW_API_BASE_URL, getSatflowConfig } = require('../../core/environment');
 const { logError } = require('../../../utils/logger');
 
+const RUNE_ORDER_PAGE_SIZE = 100;
+
 /**
  * Fetches valid sell orders for a rune from Satflow.
  * @param {string} runeTicker - The rune collection slug used by Satflow
+ * @param {number} depthSats - Market depth in satoshis to cover before stopping
  * @returns {Promise<Array>} Array of normalized sell orders
  */
 function getActivityItems(data, ...legacyKeys) {
@@ -138,21 +141,58 @@ function normalizeRuneOrder(listing) {
   };
 }
 
-async function fetchRuneOrders(runeTicker) {
-  try {
-    const { data } = await axios.get(
-      `${SATFLOW_API_BASE_URL}/activity/listings`,
-      getSatflowConfig({
-        collectionSlug: runeTicker,
-        sortBy: 'unitPrice',
-        sortDirection: 'asc',
-        active: true
-      })
-    );
+function calculateOrderValue(order) {
+  const amount = Number(order.formattedAmount);
+  const unitPrice = Number(order.formattedUnitPrice);
+  const value = amount * unitPrice;
 
-    return getActivityItems(data, 'listings')
-      .map(normalizeRuneOrder)
-      .filter(order => order !== null);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+async function fetchRuneOrders(runeTicker, depthSats) {
+  const orders = [];
+  const shouldFetchToDepth = Number.isFinite(depthSats) && depthSats > 0;
+  let accumulatedValue = 0;
+  let page = 1;
+  let totalPages = Infinity;
+
+  try {
+    while (page <= totalPages) {
+      const { data } = await axios.get(
+        `${SATFLOW_API_BASE_URL}/activity/listings`,
+        getSatflowConfig({
+          collectionSlug: runeTicker,
+          sortBy: 'unitPrice',
+          sortDirection: 'asc',
+          active: true,
+          page,
+          pageSize: RUNE_ORDER_PAGE_SIZE
+        })
+      );
+
+      const items = getActivityItems(data, 'listings');
+      const normalizedOrders = items
+        .map(normalizeRuneOrder)
+        .filter(order => order !== null);
+
+      orders.push(...normalizedOrders);
+      accumulatedValue += normalizedOrders.reduce((sum, order) => sum + calculateOrderValue(order), 0);
+
+      const responseTotalPages = Number(data?.data?.pagination?.totalPages);
+      if (Number.isFinite(responseTotalPages) && responseTotalPages > 0) {
+        totalPages = responseTotalPages;
+      } else if (items.length < RUNE_ORDER_PAGE_SIZE) {
+        break;
+      }
+
+      if (!shouldFetchToDepth || accumulatedValue >= depthSats || items.length === 0) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return orders;
   } catch (error) {
     logError(`Rune market price fetch failed: ${error.message}`);
     return [];

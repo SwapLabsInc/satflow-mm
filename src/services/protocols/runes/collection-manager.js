@@ -55,7 +55,7 @@ class RunesCollectionManager extends BaseCollectionManager {
     console.log(`\n=== Processing Rune ${envTicker} ===`);
     
     // Fetch market data and calculate prices
-    const orders = await fetchRuneOrders(apiTicker);
+    const orders = await fetchRuneOrders(apiTicker, depthSats);
     if (!orders || orders.length === 0) {
       console.log(`No orders found for ${envTicker}`);
       return;
