@@ -5,13 +5,35 @@ const { SATFLOW_API_BASE_URL, getSatflowConfig } = require('../../core/environme
 
 const loggedSatflowBidFeedErrors = new Set();
 
+function getActivityItems(data, ...legacyKeys) {
+  const activityData = data?.data;
+
+  if (Array.isArray(activityData?.items)) {
+    return activityData.items;
+  }
+
+  for (const key of legacyKeys) {
+    if (Array.isArray(activityData?.[key])) {
+      return activityData[key];
+    }
+  }
+
+  return [];
+}
+
 function normalizeSatflowListing(item) {
   const ask = item?.ask;
-  const price = Number(ask?.price);
-  const inscriptionId = ask?.inscriptionId || item?.token?.inscription_id || item?.token?.id;
-  const seller = ask?.sellerOrdAddress || item?.seller || item?.owner;
+  const listing = item?.listing;
+  const price = Number(ask?.price ?? item?.price ?? listing?.price);
+  const inscriptionId = ask?.inscriptionId || item?.inscriptionId || item?.token?.inscription_id || item?.token?.id;
+  const seller = ask?.sellerOrdAddress ||
+    item?.sellerOrdAddress ||
+    listing?.sellerAddress ||
+    item?.sellerAddress ||
+    item?.seller ||
+    item?.owner;
 
-  if (!inscriptionId || !seller || !Number.isFinite(price) || price <= 0) {
+  if (!inscriptionId || !Number.isFinite(price) || price <= 0) {
     return null;
   }
 
@@ -38,7 +60,7 @@ function normalizeSatflowBid(item) {
     item?.maker ||
     item?.bidder?.address;
 
-  if (!maker || !Number.isFinite(price) || price <= 0) {
+  if (!Number.isFinite(price) || price <= 0) {
     return null;
   }
 
@@ -63,7 +85,7 @@ async function fetchSatflowListings(collectionId) {
       getSatflowConfig(params)
     );
 
-    return data.data?.listings || [];
+    return getActivityItems(data, 'listings');
   } catch (error) {
     logError(`❌ Satflow API Error for collection '${collectionId}':`);
     logError(`   📍 Params: ${JSON.stringify(params)}`);
@@ -96,7 +118,7 @@ async function fetchSatflowBids(collectionId) {
       })
     );
 
-    return data.data?.bids || data.data?.results || [];
+    return getActivityItems(data, 'bids', 'results');
   } catch (error) {
     if (!loggedSatflowBidFeedErrors.has(collectionId)) {
       loggedSatflowBidFeedErrors.add(collectionId);
@@ -133,7 +155,7 @@ async function fetchCollectionBids(collectionSymbol) {
   try {
     const satflowBids = (await fetchSatflowBids(collectionSymbol))
       .map(normalizeSatflowBid)
-      .filter(bid => bid && !ignoredAddresses.has(bid.maker))
+      .filter(bid => bid && (!bid.maker || !ignoredAddresses.has(bid.maker)))
       .sort((a, b) => b.price - a.price);
 
     console.log(`\n📊 Collection Bid Analysis for ${collectionSymbol}:`);
@@ -163,7 +185,7 @@ async function fetchMarketPrice(collectionSymbol) {
   try {
     const listings = (await fetchSatflowListings(collectionSymbol))
       .map(normalizeSatflowListing)
-      .filter(listing => listing && !ignoredAddresses.has(listing.seller));
+      .filter(listing => listing && (!listing.seller || !ignoredAddresses.has(listing.seller)));
 
     console.log(`\n📊 Market Analysis for ${collectionSymbol}:`);
     console.log(`⚡ Satflow: ${listings.length} listings`);

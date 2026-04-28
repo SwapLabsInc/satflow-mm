@@ -7,6 +7,22 @@ const { logError } = require('../../../utils/logger');
  * @param {string} runeTicker - The rune collection slug used by Satflow
  * @returns {Promise<Array>} Array of normalized sell orders
  */
+function getActivityItems(data, ...legacyKeys) {
+  const activityData = data?.data;
+
+  if (Array.isArray(activityData?.items)) {
+    return activityData.items;
+  }
+
+  for (const key of legacyKeys) {
+    if (Array.isArray(activityData?.[key])) {
+      return activityData[key];
+    }
+  }
+
+  return [];
+}
+
 function toBigInt(value) {
   if (typeof value === 'bigint') {
     return value;
@@ -82,7 +98,11 @@ function normalizeRuneOrder(listing) {
     amountString = bigIntToDecimal(rawAmount, divisibility);
   } else {
     const displayAmount = Number(
+      listing?.formattedAmount ??
+      listing?.amount ??
+      listing?.runeAmount ??
       listing?.token?.amount ??
+      listing?.token?.rune_amount_formatted ??
       listing?.quantity ??
       listing?.token?.inscription_number ??
       listing?.token?.inscriptionNumber
@@ -130,7 +150,7 @@ async function fetchRuneOrders(runeTicker) {
       })
     );
 
-    return (data?.data?.listings || [])
+    return getActivityItems(data, 'listings')
       .map(normalizeRuneOrder)
       .filter(order => order !== null);
   } catch (error) {
