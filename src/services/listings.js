@@ -110,9 +110,13 @@ async function listOnSatflow(item, listingPriceSats) {
         logError('Intent sell payload sent:', JSON.stringify(intentSellPayload, null, 2));
       }
       if (bulkListPayload) {
-        logError('Bulk list payload sent:', JSON.stringify(bulkListPayload, null, 2));
+        // The signed PSBTs are order material; log only their count.
+        const { signedListingPSBT, unsignedListingPSBT, signedSecureListingPSBTs, ...listingFields } = bulkListPayload;
+        logError('Bulk list payload sent (PSBTs omitted):', JSON.stringify({
+          ...listingFields,
+          signedSecureListingPSBTCount: signedSecureListingPSBTs.length
+        }, null, 2));
       }
-      logError('Request headers:', JSON.stringify(error.config?.headers, null, 2));
     }
 
     throw error;

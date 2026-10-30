@@ -107,7 +107,6 @@ async function fetchSatflowListings(collectionId) {
     logError(`   📊 Status: ${error.response?.status || 'No status'}`);
     logError(`   📄 Response Data:`, JSON.stringify(error.response?.data, null, 2));
     logError(`   🔑 API Key Present: ${process.env.SATFLOW_API_KEY ? 'Yes' : 'No'}`);
-    logError(`   🔑 Request Headers:`, JSON.stringify(error.config?.headers, null, 2));
     logError(`   💬 Full Error Message: ${error.message}`);
 
     if (error.response?.status === 404) {
