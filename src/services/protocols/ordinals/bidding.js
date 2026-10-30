@@ -199,10 +199,10 @@ class OrdinalsBiddingService {
         logError('Response data:', error.response.data);
         logError('Response status:', error.response.status);
         
-        // Debug: dump the payload on 400 errors, without the signature
+        // Debug: dump the payload on 400 errors, without the signatures
         if (error.response.status === 400 && payload) {
-          const { signedBiddingMessage, ...bidFields } = payload;
-          logError('DEBUG - Payload sent to Satflow (signature omitted):', JSON.stringify(bidFields, null, 2));
+          const { signedBiddingMessage, signature, ...bidFields } = payload;
+          logError('DEBUG - Payload sent to Satflow (signatures omitted):', JSON.stringify(bidFields, null, 2));
         }
       }
       throw error;
